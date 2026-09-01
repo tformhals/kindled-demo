@@ -1,4 +1,4 @@
-/* KINDLED — grounded keeper web slice. TAP pulse / DRAG strafe. */
+/* KINDLED — grounded keeper web slice. PATH: TAP pulse / DRAG strafe. RIDGE: TAP jump. */
 (() => {
   "use strict";
 
@@ -23,12 +23,12 @@
     "hollow-cave-cricket": { sheet: "ground", i: 1, hue: 35, r: 12, mag: 0.65, spawn: 0.3, hop: true },
     "salt-stripe-tiger": { sheet: "ground", i: 2, hue: 45, r: 12, mag: 0.6, spawn: 0.12 },
     "bank-glowworm": { sheet: "ground", i: 3, hue: 95, r: 10, mag: 1.1, spawn: 0.22 },
-    "fen-mosquito": { sheet: "pests", i: 0, hue: 200, r: 10, mag: 0.35, spawn: 0.55 },
-    "paper-nest-wasp": { sheet: "pests", i: 1, hue: 42, r: 14, mag: 0.45, spawn: 0.28 },
+    "fen-mosquito": { sheet: "pests", i: 0, hue: 200, r: 13, mag: 0.35, spawn: 0.55 },
+    "paper-nest-wasp": { sheet: "pests", i: 1, hue: 42, r: 18, mag: 0.45, spawn: 0.28 },
     "gate-orb-weaver": { sheet: "pests", i: 2, hue: 25, r: 16, mag: 0.9, spawn: 0.22 }
   };
 
-  const DEX_RAW = [{"id": "pale-wickmoth", "commonName": "Pale Wickmoth", "latin": "Lucerna pallida", "rarity": "common", "habitat": "aerial", "nectar": 4, "speed": 165, "catchWindow": 2.4, "weakness": "Hold a still beam; they lock on the glass and sit.", "notes": "Treats the chimney like a second moon.", "threat": false}, {"id": "ash-vein-underwing", "commonName": "Ash-vein Underwing", "latin": "Catocala cinerea", "rarity": "uncommon", "habitat": "aerial", "nectar": 9, "speed": 190, "catchWindow": 2.0, "weakness": "Cover the lantern; they stall when the lure dies.", "notes": "Hindwings flash soot-gray, then vanish on bark.", "threat": false}, {"id": "velvet-snout", "commonName": "Velvet Snout", "latin": "Hypena velutina", "rarity": "common", "habitat": "aerial", "nectar": 5, "speed": 175, "catchWindow": 2.2, "weakness": "Smoke from a snuffed wick.", "notes": "Drinks dew off grass; nets easy if you kneel.", "threat": false}, {"id": "ember-hawkmoth", "commonName": "Ember Hawkmoth", "latin": "Sphinx favilla", "rarity": "rare", "habitat": "aerial", "nectar": 18, "speed": 210, "catchWindow": 1.6, "weakness": "Drop the shutter; they overshoot a dying light.", "notes": "Hovers at the lantern lip; wait for the sip.", "threat": false}, {"id": "marsh-lampfly", "commonName": "Marsh Lampfly", "latin": "Photinus palustris", "rarity": "uncommon", "habitat": "aerial", "nectar": 8, "speed": 140, "catchWindow": 2.5, "weakness": "Outshine their flash; your lantern wins the courtship.", "notes": "Males blink a slow two-count over wet ground; the steady green beads are females, leave them.", "threat": false}, {"id": "dusk-carabid", "commonName": "Dusk Carabid", "latin": "Carabus crepuscularis", "rarity": "common", "habitat": "ground", "nectar": 6, "speed": 90, "catchWindow": 2.8, "weakness": "Chimney heat; they bolt from warm soil.", "notes": "Patrols the path after rain; clicks if you pinch too hard.", "threat": false}, {"id": "hollow-cave-cricket", "commonName": "Hollow Cave Cricket", "latin": "Ceuthophilus cavus", "rarity": "uncommon", "habitat": "ground", "nectar": 7, "speed": 160, "catchWindow": 1.8, "weakness": "Sudden full beam; they freeze, then ricochet.", "notes": "Antennae longer than the body; follows the cool of stone.", "threat": false}, {"id": "salt-stripe-tiger", "commonName": "Salt-stripe Tiger", "latin": "Cicindela salina", "rarity": "rare", "habitat": "ground", "nectar": 16, "speed": 260, "catchWindow": 1.2, "weakness": "Sidestep, then pin; they charge the light in a straight line.", "notes": "Too fast to net from the front; wait for the halt.", "threat": false}, {"id": "bank-glowworm", "commonName": "Bank Glowworm", "latin": "Lampyris riparia", "rarity": "rare", "habitat": "cliff", "nectar": 14, "speed": 20, "catchWindow": 3.0, "weakness": "Shade the lantern; your glow steals their lure.", "notes": "Wingless female, a green bead in the grass; not a spark, don't pocket it dry.", "threat": false}, {"id": "fen-mosquito", "commonName": "Fen Mosquito", "latin": "Culex paludis", "rarity": "common", "habitat": "pest", "nectar": 0, "speed": 220, "catchWindow": 1.5, "weakness": "Heat and smoke of the lantern; they peel off the plume.", "notes": "Hunts ears and wrists; one will call ten.", "threat": true}, {"id": "paper-nest-wasp", "commonName": "Paper-nest Wasp", "latin": "Polistes chartacea", "rarity": "uncommon", "habitat": "pest", "nectar": 0, "speed": 240, "catchWindow": 1.4, "weakness": "Smoke and back off; never swing.", "notes": "Paper nest under eaves; a strike makes the whole porch yours to lose.", "threat": true}, {"id": "gate-orb-weaver", "commonName": "Gate Orb-weaver", "latin": "Araneus portarum", "rarity": "common", "habitat": "pest", "nectar": 0, "speed": 40, "catchWindow": 2.6, "weakness": "Pluck a radial thread, lantern behind you.", "notes": "Rebuilds the same gate every dusk; walk through and you'll wear her.", "threat": true}];
+  const DEX_RAW = [{"id": "pale-wickmoth", "commonName": "Pale Wickmoth", "latin": "Lucerna pallida", "rarity": "common", "habitat": "aerial", "nectar": 4, "speed": 165, "catchWindow": 2.4, "weakness": "Still lantern. They lock on the glass and sit.", "notes": "Common as chimney dust. Slow. First moth of the night.", "threat": false}, {"id": "ash-vein-underwing", "commonName": "Ash-vein Underwing", "latin": "Catocala cinerea", "rarity": "uncommon", "habitat": "aerial", "nectar": 9, "speed": 190, "catchWindow": 2.0, "weakness": "Darken the lamp a beat. They stall.", "notes": "Hindwings flash ash, then bark. Lost them twice on one trunk.", "threat": false}, {"id": "velvet-snout", "commonName": "Velvet Snout", "latin": "Hypena velutina", "rarity": "common", "habitat": "aerial", "nectar": 5, "speed": 175, "catchWindow": 2.2, "weakness": "Smoke off a snuffed wick. They drop.", "notes": "Drinks dew off the blades. Low. Wait; don't chase.", "threat": false}, {"id": "ember-hawkmoth", "commonName": "Ember Hawkmoth", "latin": "Sphinx favilla", "rarity": "rare", "habitat": "aerial", "nectar": 18, "speed": 210, "catchWindow": 1.6, "weakness": "Dim the lamp. They overshoot and hang.", "notes": "Hovers at the lip. Wait for the sip. Rare. Don't rush.", "threat": false}, {"id": "marsh-lampfly", "commonName": "Marsh Lampfly", "latin": "Photinus palustris", "rarity": "uncommon", "habitat": "aerial", "nectar": 8, "speed": 140, "catchWindow": 2.5, "weakness": "Hold a steady lamp. Males come to the brighter flash.", "notes": "Two-count blink is male. Steady green bead is female. Leave her.", "threat": false}, {"id": "dusk-carabid", "commonName": "Dusk Carabid", "latin": "Carabus crepuscularis", "rarity": "common", "habitat": "ground", "nectar": 6, "speed": 90, "catchWindow": 2.8, "weakness": "Lamp heat. They bolt from warm soil. Pin the run.", "notes": "After rain, on the packed trail. Clicks if you grip too hard.", "threat": false}, {"id": "hollow-cave-cricket", "commonName": "Hollow Cave Cricket", "latin": "Ceuthophilus cavus", "rarity": "uncommon", "habitat": "ground", "nectar": 7, "speed": 160, "catchWindow": 1.8, "weakness": "Sudden full beam. Freeze, then ricochet. Pin the freeze.", "notes": "Antennae longer than the body. Follows cool stone, not the lamp.", "threat": false}, {"id": "salt-stripe-tiger", "commonName": "Salt-stripe Tiger", "latin": "Cicindela salina", "rarity": "rare", "habitat": "ground", "nectar": 16, "speed": 260, "catchWindow": 1.2, "weakness": "Charges the lamp in a line. Sidestep, then pin the halt.", "notes": "Fastest thing on the salt. Don't meet it head-on.", "threat": false}, {"id": "bank-glowworm", "commonName": "Bank Glowworm", "latin": "Lampyris riparia", "rarity": "rare", "habitat": "cliff", "nectar": 14, "speed": 20, "catchWindow": 3.0, "weakness": "Shade your lamp. Her glow is the lure; yours washes it out.", "notes": "Wingless female. Green bead in the bank grass. Don't pocket her dry.", "threat": false}, {"id": "fen-mosquito", "commonName": "Fen Mosquito", "latin": "Culex paludis", "rarity": "common", "habitat": "pest", "nectar": 0, "speed": 220, "catchWindow": 1.5, "weakness": "Lamp heat and smoke. They peel off. Don't swat.", "notes": "Ears and wrists. One calls ten. Keep walking.", "threat": true}, {"id": "paper-nest-wasp", "commonName": "Paper-nest Wasp", "latin": "Polistes chartacea", "rarity": "uncommon", "habitat": "pest", "nectar": 0, "speed": 240, "catchWindow": 1.4, "weakness": "Smoke. Back off. Never swing.", "notes": "Grey paper under the eaves. Hit one and the nest comes too.", "threat": true}, {"id": "gate-orb-weaver", "commonName": "Gate Orb-weaver", "latin": "Araneus portarum", "rarity": "common", "habitat": "pest", "nectar": 0, "speed": 40, "catchWindow": 2.6, "weakness": "Lamp behind you. Pluck a radial. Don't walk the web.", "notes": "Same gate every dusk. Walk it and you carry her home.", "threat": true}];
 
   const SPEC = DEX_RAW.map((d) => {
     const p = PLAY[d.id] || { sheet: "moths", i: 0, hue: 40, r: 12, mag: 1, spawn: 0.4 };
@@ -64,6 +64,7 @@
     return {
       nights: 0, nectar: 0, xp: 0, bestCombo: 0,
       difficulty: "keep",
+      view: "path",
       equipped: { wide: true, step: false, veil: false },
       chips: { wide: 0, step: 0, veil: 0 },
       dex: {}
@@ -78,6 +79,7 @@
       save.equipped = Object.assign(defaultSave().equipped, p.equipped || {});
       save.chips = Object.assign(defaultSave().chips, p.chips || {});
       save.dex = p.dex || {};
+      if (save.view !== "ridge") save.view = "path";
     }
   } catch (_) {}
   function persist() {
@@ -96,7 +98,7 @@
       if (!AC) return;
       this.ac = new AC();
       this.master = this.ac.createGain(); this.master.gain.value = 1;
-      this.musicG = this.ac.createGain(); this.musicG.gain.value = 0.38;
+      this.musicG = this.ac.createGain(); this.musicG.gain.value = 0.28;
       this.sfxG = this.ac.createGain(); this.sfxG.gain.value = 0.72;
       this.musicG.connect(this.master); this.sfxG.connect(this.master);
       this.master.connect(this.ac.destination);
@@ -105,7 +107,7 @@
       this.ensure();
       if (!this.ac) return;
       if (this.ac.state === "suspended") this.ac.resume();
-      if (!this.unlocked) { this.unlocked = true; this.startMusic(); this.startPad(); }
+      if (!this.unlocked) { this.unlocked = true; this.startMusic(); if (!this.musicEl) this.startPad(); }
     },
     now() { return this.ac ? this.ac.currentTime : 0; },
     env(g, a, d, v, t0) {
@@ -162,6 +164,7 @@
       });
     },
     pickup() { this.playTag("pickup"); this.osc("sine", 784, 0.01, 0.18, 0.2); this.osc("triangle", 1176, 0.02, 0.22, 0.1); },
+    jump() { this.playTag("jump"); this.noise(0.01, 0.14, 0.2, 180, 1600); this.osc("sine", 196, 0.008, 0.18, 0.22); },
     ui() { this.osc("sine", 440, 0.005, 0.08, 0.09); },
     duck() {
       if (!this.musicG || !this.ac) return;
@@ -169,19 +172,19 @@
       this.musicG.gain.cancelScheduledValues(t);
       this.musicG.gain.setValueAtTime(this.musicG.gain.value, t);
       this.musicG.gain.linearRampToValueAtTime(0.12, t + 0.05);
-      this.musicG.gain.linearRampToValueAtTime(0.38, t + 0.5);
+      this.musicG.gain.linearRampToValueAtTime(0.28, t + 0.5);
     },
     startMusic() {
       if (this.musicEl) return;
       const el = new Audio("audio/night-score.ogg");
       el.loop = true; el.preload = "auto";
-      ["pulse","catch","hit","land","pickup"].forEach((k) => { this.buf[k] = new Audio("audio/sfx-" + k + ".ogg"); });
-      try { this.music = this.ac.createMediaElementSource(el); this.music.connect(this.musicG); } catch (_) { el.volume = 0.35; }
+      ["pulse","catch","hit","land","pickup","jump","combo"].forEach((k) => { this.buf[k] = new Audio("audio/sfx-" + k + ".ogg"); });
+      try { this.music = this.ac.createMediaElementSource(el); this.music.connect(this.musicG); } catch (_) { el.volume = 0.28; }
       el.play().catch(() => {});
       this.musicEl = el;
     },
     startPad() {
-      if (!this.ac || this.pad) return;
+      if (!this.ac || this.pad || this.musicEl) return;
       const make = (freq, type, g, detune) => {
         const o = this.ac.createOscillator();
         const gain = this.ac.createGain();
@@ -202,7 +205,7 @@
 
   let W = 405, H = 720, dpr = 1;
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 500 ? 1.5 : 1.75);
     const vw = window.innerWidth, vh = window.innerHeight, aspect = 9 / 16;
     let cssW, cssH;
     if (vw / vh > aspect) { cssH = vh; cssW = vh * aspect; }
@@ -290,8 +293,12 @@
   }).catch(() => { if (bootEl) bootEl.textContent = "art missing"; });
 
   const parts = [];
+  const PARTS_MAX = 48;
   function burst(x, y, n, opt) {
     opt = opt || {};
+    if (parts.length >= PARTS_MAX) return;
+    n = Math.min(n, 8, PARTS_MAX - parts.length);
+    if (n <= 0) return;
     for (let i = 0; i < n; i++) {
       const ang = opt.ang != null ? opt.ang + rand(-0.4, 0.4) : rand(0, TAU);
       const sp = (opt.speed || 90) * rand(0.3, 1.15);
@@ -364,13 +371,14 @@
   let roostView = "hub", trophyFilter = "all", cardId = null, landT = 0, roostT = 0;
   const hits = [];
   const DIFF = () => DIFFS[save.difficulty] || DIFFS.keep;
+  function isRidge() { return save.view === "ridge"; }
 
   const run = {
     t: 0, dur: 54, nectar: 0, combo: 0, comboT: 0, bestCombo: 0, kindledT: 0,
     catches: 0, wick: 3, wickMax: 3, invuln: 0, crashed: false, shake: 0, hitFlash: 0,
     magnetT: 0, aegisT: 0, veilT: 0, bitten: false
   };
-  const keeper = { x: 0.5, y: 0.76, bank: 0, vis: 0, roll: 0, pulseT: 99, pulseCd: 0, facing: 1, bob: 0, glow: 1 };
+  const keeper = { x: 0.5, y: 0.76, bank: 0, vis: 0, roll: 0, pulseT: 99, pulseCd: 0, facing: 1, bob: 0, glow: 1, stagger: 0, vy: 0, grounded: true, coyote: 0 };
   const ents = [];
   const pulseRings = [];
   const speedLines = [];
@@ -378,13 +386,30 @@
   let comboPop = 0, lastCatchName = "", lastCatchT = 0;
   let teachTap = true, teachHold = true;
 
-  function laneX() { return W * 0.5 + clamp(keeper.vis, -1, 1) * W * 0.34; }
+  function laneX() {
+    if (isRidge() && (state === STATE.FLY || state === STATE.LAND)) {
+      return W * 0.22 + clamp(keeper.vis, -1, 1) * W * 0.12;
+    }
+    return W * 0.5 + clamp(keeper.vis, -1, 1) * W * 0.34;
+  }
   function keeperPx() { return { x: laneX(), y: H * keeper.y }; }
   function lanternPx() {
     const k = keeperPx();
-    return { x: k.x + keeper.facing * 26, y: k.y - 46 };
+    const bobY = Math.sin(keeper.bob) * 2.2;
+    const arm = Math.sin(keeper.bob + 0.45) * 5 * (keeper.stagger > 0 ? 0.3 : 1);
+    return { x: k.x + keeper.facing * 28, y: k.y - 48 + bobY + arm * 0.4 };
   }
-  function xToBank(px) { return clamp((px - W * 0.5) / (W * 0.34), -1, 1); }
+  function xToBank(px) {
+    if (isRidge()) return clamp((px - W * 0.22) / (W * 0.12), -1, 1);
+    return clamp((px - W * 0.5) / (W * 0.34), -1, 1);
+  }
+  function glowRadius() {
+    let r = 48;
+    if (equipped("wide")) r *= 1.38;
+    r *= 1 + (save.chips.wide || 0) * 0.018;
+    if (run.kindledT > 0) r *= 1.16;
+    return r;
+  }
   function equipped(id) { return !!save.equipped[id]; }
   function pulseRadiusPx() {
     let r = 0.155 * Math.min(W, H);
@@ -400,22 +425,37 @@
     const d = DIFF();
     run.t = 0; run.dur = rand(48, 62); run.nectar = 0; run.combo = 0; run.comboT = 0;
     run.bestCombo = 0; run.kindledT = 0; run.catches = 0;
-    run.wickMax = d.wick; run.wick = d.wick; run.invuln = 0.45; run.crashed = false;
+    run.wickMax = d.wick; run.wick = d.wick; run.invuln = 1.6; run.crashed = false;
     run.shake = 0; run.hitFlash = 0; run.magnetT = 0; run.aegisT = 0; run.veilT = 0; run.bitten = false;
     ents.length = 0; pulseRings.length = 0; speedLines.length = 0;
     keeper.bank = 0; keeper.vis = 0; keeper.roll = 0; keeper.facing = 1;
-    keeper.pulseT = 99; keeper.pulseCd = 0; keeper.glow = 1;
-    spawnAcc = 0.12; pestAcc = 2.4; pickAcc = 7; worldZ = 0; comboPop = 0;
+    keeper.pulseT = 99; keeper.pulseCd = 0; keeper.glow = 1; keeper.bob = 0; keeper.stagger = 0;
+    keeper.vy = 0; keeper.grounded = true; keeper.coyote = 0;
+    spawnAcc = 0.12; pestAcc = 0; pickAcc = 7; worldZ = 0; comboPop = 0;
     lastCatchName = ""; lastCatchT = 0;
     teachTap = save.nights < 2; teachHold = save.nights < 2;
-    const lp = lanternPx();
-    spawnSpec(SPEC_BY["pale-wickmoth"], lp.x + rand(-28, 28), H * 0.42);
-    spawnSpec(SPEC_BY["marsh-lampfly"], lp.x + 48, H * 0.32);
-    spawnSpec(SPEC_BY["dusk-carabid"], W * 0.55, H * 0.18);
-    spawnSpec(SPEC_BY["fen-mosquito"], W * 0.38, H * 0.08);
+    if (isRidge()) {
+      keeper.y = 0.82; keeper.facing = 1; keeper.bank = 0; keeper.vis = 0;
+      spawnSpec(SPEC_BY["pale-wickmoth"], W * 0.55, H * 0.52);
+      spawnSpec(SPEC_BY["marsh-lampfly"], W * 0.72, H * 0.40);
+      spawnSpec(SPEC_BY["dusk-carabid"], W * 0.62, H * 0.82 - 6);
+    } else {
+      keeper.y = 0.76;
+      const lp = lanternPx();
+      spawnSpec(SPEC_BY["pale-wickmoth"], lp.x + rand(-28, 28), H * 0.42);
+      spawnSpec(SPEC_BY["marsh-lampfly"], lp.x + 48, H * 0.32);
+      spawnSpec(SPEC_BY["dusk-carabid"], W * 0.55, H * 0.18);
+    }
+  }
+
+  function liveEnts() {
+    let n = 0;
+    for (let i = 0; i < ents.length; i++) if (ents[i].alive) n++;
+    return n;
   }
 
   function spawnSpec(def, x, y, delay) {
+    if (liveEnts() >= 18) return null;
     const e = {
       def, id: def.id, kind: def.kind, x, y,
       vx: rand(-18, 18), vy: scrollSpeed() * (0.55 + (def.speedMul || 0.4)) * rand(0.85, 1.12),
@@ -423,8 +463,21 @@
       magnet: false, magSp: 0, alive: true, hopT: 0, dodgeT: 0,
       gap: 0, gapW: 0, side: x < W * 0.5 ? -1 : 1, burned: false
     };
-    if (def.id === "gate-orb-weaver") { e.gap = rand(W * 0.22, W * 0.78); e.gapW = rand(54, 82); e.y = -20; }
-    if (def.kind === "cliff") { e.x = e.side < 0 ? W * 0.1 : W * 0.9; e.vy = scrollSpeed() * 0.22; }
+    if (isRidge()) {
+      e.vx = -scrollSpeed() * (0.5 + (def.speedMul || 0.4)) * rand(0.9, 1.15);
+      if (def.id === "gate-orb-weaver") {
+        e.webMode = Math.random() < 0.5 ? "low" : "vert";
+        e.x = W + 36;
+        if (e.webMode === "low") { e.y = H * 0.70; e.webLen = rand(30, 46); }
+        else { e.gap = rand(H * 0.46, H * 0.58); e.gapW = rand(90, 120); e.y = e.gap; }
+      } else if (def.kind === "ground" || def.kind === "cliff") {
+        e.y = H * 0.82 - 6;
+      }
+    } else {
+      if (def.id === "gate-orb-weaver") { e.gap = rand(W * 0.22, W * 0.78); e.gapW = rand(54, 82); e.y = -20; }
+      if (def.id === "fen-mosquito") e.y = -30;
+      if (def.kind === "cliff") { e.x = e.side < 0 ? W * 0.1 : W * 0.9; e.vy = scrollSpeed() * 0.22; }
+    }
     ents.push(e);
     return e;
   }
@@ -436,6 +489,7 @@
       if (d.id === "pale-wickmoth") w *= lerp(1.4, 0.5, t);
       if (d.id === "salt-stripe-tiger") w *= t < 0.22 ? 0.2 : 1;
       if (d.id === "ember-hawkmoth") w *= t < 0.12 ? 0.3 : 1;
+      if (d.id === "gate-orb-weaver" && run.t < 12) w = 0;
       if (d.kind === "pest") w *= DIFF().pest;
       return { d, w };
     });
@@ -449,14 +503,29 @@
     } else spawnSpec(def, x, y, 0);
   }
 
+  function doJump() {
+    if (!isRidge() || state !== STATE.FLY) return;
+    if (!(keeper.grounded || keeper.coyote > 0)) return;
+    keeper.vy = -1.4 * H;
+    keeper.grounded = false;
+    keeper.coyote = 0;
+    keeper.pulseT = 0;
+    if (equipped("step")) run.invuln = Math.max(run.invuln, 0.4 + (save.chips.step || 0) * 0.04);
+    if (equipped("veil")) run.veilT = Math.max(run.veilT, 1.6 + (save.chips.veil || 0) * 0.12);
+    SFX.jump(); vibe(10);
+    const kp = keeperPx();
+    burst(kp.x, kp.y + 8, 6, { hue: 38, speed: 70, life: 0.28, size: 1.6, ember: true });
+  }
+
   function doPulse() {
+    if (isRidge()) { doJump(); return; }
     if (keeper.pulseCd > 0) return;
     keeper.pulseCd = pulseCdMax();
     keeper.pulseT = 0; keeper.glow = 1.9;
     const lp = lanternPx(), R = pulseRadiusPx();
     pulseRings.push({ x: lp.x, y: lp.y, r: 8, max: R * 1.12, life: 0.34, a: 1 });
     SFX.pulse(); vibe(14);
-    burst(lp.x, lp.y, 20, { hue: 38, speed: 150, life: 0.36, size: 2.2, streak: true, ember: true });
+    burst(lp.x, lp.y, 8, { hue: 38, speed: 150, life: 0.36, size: 2.2, streak: true, ember: true });
     if (equipped("step")) run.invuln = Math.max(run.invuln, 0.55 + (save.chips.step || 0) * 0.04);
     if (equipped("veil")) run.veilT = Math.max(run.veilT, 1.6 + (save.chips.veil || 0) * 0.12);
     for (const e of ents) {
@@ -482,7 +551,7 @@
     if (!e.alive) return;
     e.alive = false; e.burned = true;
     logDex(e.def.id);
-    burst(e.x, e.y, 16, { hue: 38, speed: 110, life: 0.4, size: 2, streak: true, ember: true });
+    burst(e.x, e.y, 8, { hue: 38, speed: 110, life: 0.4, size: 2, streak: true, ember: true });
     floatText(e.gap || e.x, e.y - 8, "strand burns", { hue: 38, size: 12, life: 0.6 });
     run.nectar += 3;
   }
@@ -507,7 +576,7 @@
     SFX.catch();
     if (run.combo >= 2) SFX.combo();
     vibe(run.combo >= 5 ? [6, 20, 10] : 10);
-    burst(e.x, e.y, 16, { hue: e.def.hue, speed: 160, life: 0.45, size: 2.5, streak: true, ember: true });
+    burst(e.x, e.y, 8, { hue: e.def.hue, speed: 160, life: 0.45, size: 2.5, streak: true, ember: true });
     floatText(lp.x + rand(-16, 16), lp.y - 40, `+${n}`, { hue: e.def.hue, size: 14 + Math.min(8, run.combo) });
   }
 
@@ -520,12 +589,13 @@
     if (run.invuln > 0 || run.aegisT > 0 || run.veilT > 0) return;
     if (e) e.alive = false;
     run.wick = Math.max(0, run.wick - 1);
-    run.invuln = 0.9; run.shake = 1; run.hitFlash = 1;
+    run.invuln = 1.35; run.shake = 1; run.hitFlash = 1;
     if (label === "bite") run.bitten = true;
     run.combo = 0; run.comboT = 0;
     SFX.hit(); vibe([18, 30, 40]);
     const kp = keeperPx();
-    burst(kp.x, kp.y, 18, { hue: 8, speed: 150, life: 0.45, size: 2.4, sat: 40 });
+    keeper.stagger = 0.2;
+    burst(kp.x, kp.y, 8, { hue: 8, speed: 150, life: 0.45, size: 2.4, sat: 40 });
     floatText(kp.x, kp.y - 36, label || "wick", { hue: 12, size: 14, life: 0.7 });
     if (e && e.def && e.def.threat) logDex(e.def.id);
     if (run.wick <= 0) { run.crashed = true; beginLand(); }
@@ -545,13 +615,18 @@
       run.aegisT = 5;
       floatText(kp.x, kp.y - 40, "aegis 5s", { hue: 210, size: 14 });
     }
-    burst(e.x, e.y, 14, { hue: e.pid === "wick" ? 110 : e.pid === "magnet" ? 200 : 0, speed: 90, life: 0.4, size: 2.2, ember: true });
+    burst(e.x, e.y, 8, { hue: e.pid === "wick" ? 110 : e.pid === "magnet" ? 200 : 0, speed: 90, life: 0.4, size: 2.2, ember: true });
   }
 
   function spawnPickup() {
+    if (liveEnts() >= 18) return;
     const kinds = ["wick", "magnet", "aegis"];
     const pid = kinds[(Math.random() * 3) | 0];
-    ents.push({ pickup: true, pid, x: W * 0.5 + rand(-W * 0.3, W * 0.3), y: -20, vy: scrollSpeed() * 0.7, alive: true, age: 0, kind: "pickup", phase: 0 });
+    if (isRidge()) {
+      ents.push({ pickup: true, pid, x: W + 24, y: rand(H * 0.42, H * 0.68), vy: 0, vx: -scrollSpeed() * 0.7, alive: true, age: 0, kind: "pickup", phase: 0 });
+    } else {
+      ents.push({ pickup: true, pid, x: W * 0.5 + rand(-W * 0.3, W * 0.3), y: -20, vy: scrollSpeed() * 0.7, alive: true, age: 0, kind: "pickup", phase: 0 });
+    }
   }
 
   const input = { pointers: new Map(), keys: Object.create(null) };
@@ -577,6 +652,10 @@
       const move = Math.hypot(loc.x - p.startX, loc.y - p.startY);
       p.maxMove = Math.max(p.maxMove, move);
       if (Math.abs(loc.x - p.startX) > MOVE_PX || move > MOVE_PX * 1.25) p.dragging = true;
+      if (state === STATE.FLY && isRidge() && !p.didJump && (p.startY - loc.y) > 32) {
+        p.didJump = true;
+        doJump();
+      }
     }
   }
   function onPointerUp(e) {
@@ -585,7 +664,11 @@
     const heldMs = p ? performance.now() - p.t : 999;
     const wasTap = p && heldMs < TAP_MS && p.maxMove < MOVE_PX && !p.dragging;
     input.pointers.delete(e.pointerId);
-    if (state === STATE.FLY && wasTap) doPulse();
+    if (state === STATE.FLY) {
+      if (isRidge()) {
+        if (wasTap && !(p && p.didJump)) doJump();
+      } else if (wasTap) doPulse();
+    }
     if (state === STATE.LAND && landT > 0.7) openRoost(true);
   }
 
@@ -599,11 +682,26 @@
 
   window.addEventListener("keydown", (e) => {
     SFX.resume(); input.keys[e.code] = true;
+    if (state === STATE.ROOST && roostView === "hub") {
+      if (e.code === "KeyP" || e.code === "Digit1") {
+        e.preventDefault();
+        save.view = "path"; persist(); SFX.ui();
+      } else if (e.code === "KeyR" || e.code === "Digit2") {
+        e.preventDefault();
+        save.view = "ridge"; persist(); SFX.ui();
+      }
+    }
     if (e.code === "Space") {
       e.preventDefault();
       if (state === STATE.TITLE) openRoost();
-      else if (state === STATE.FLY) doPulse();
-      else if (state === STATE.ROOST && roostView === "hub") startFlight();
+      else if (state === STATE.FLY && !e.repeat) {
+        if (isRidge()) doJump();
+        else doPulse();
+      } else if (state === STATE.ROOST && roostView === "hub") startFlight();
+    }
+    if ((e.code === "ArrowUp" || e.code === "KeyW") && state === STATE.FLY && isRidge() && !e.repeat) {
+      e.preventDefault();
+      doJump();
     }
     if (e.code === "Enter" && state === STATE.ROOST && roostView === "hub") startFlight();
     if (e.code === "Escape" && state === STATE.ROOST) { roostView = "hub"; cardId = null; }
@@ -626,6 +724,7 @@
     else if (h.id === "map") roostView = "map";
     else if (h.id === "trophy") { roostView = "trophy"; trophyFilter = "all"; }
     else if (h.id === "back") { roostView = "hub"; cardId = null; }
+    else if (h.id.indexOf("view:") === 0) { save.view = h.id.slice(5) === "ridge" ? "ridge" : "path"; persist(); }
     else if (h.id.indexOf("diff:") === 0) { save.difficulty = h.id.slice(5); persist(); }
     else if (h.id.indexOf("ab:") === 0) { const a = h.id.slice(3); save.equipped[a] = !save.equipped[a]; persist(); }
     else if (h.id.indexOf("filt:") === 0) trophyFilter = h.id.slice(5);
@@ -671,17 +770,74 @@
     // NEVER decay bank toward 0. Release = stay.
     keeper.vis = lerp(keeper.vis, keeper.bank, 1 - Math.pow(0.002, dt));
     keeper.bank = clamp(keeper.bank, -1, 1);
-    if (Math.abs(keeper.bank) > 0.08) keeper.facing = keeper.bank < 0 ? -1 : 1;
-    keeper.roll = lerp(keeper.roll, keeper.vis * 0.12, 1 - Math.pow(0.05, dt));
-    keeper.bob += dt * (8 + Math.abs(keeper.bank) * 4);
+    if (isRidge()) keeper.facing = 1;
+    else if (Math.abs(keeper.bank) > 0.08) keeper.facing = keeper.bank < 0 ? -1 : 1;
+    keeper.roll = lerp(keeper.roll, isRidge() ? 0 : keeper.vis * 0.12, 1 - Math.pow(0.05, dt));
+    keeper.stagger = Math.max(0, keeper.stagger - dt);
+    const bobRate = (12 + Math.abs(keeper.bank) * 2) * (keeper.stagger > 0 ? 0.45 : 1);
+    keeper.bob += dt * bobRate;
   }
 
   function updateTitle(dt) {
     titleT += dt; titlePulse += dt; worldZ += dt * 2.2;
     keeper.vis = Math.sin(titleT * 0.6) * 0.12;
+    keeper.bob += dt * 12;
     keeper.glow = 1.1 + Math.sin(titleT * 2.1) * 0.12;
     const lp = lanternPx();
     if (Math.random() < dt * 1.4) burst(lp.x, lp.y, 1, { hue: 38, speed: 16, life: 1.2, size: 1.6, g: -30, drag: 0.98, ember: true });
+  }
+
+  function updateRidgeEnt(e, dt, kp, lp) {
+    const sc = scrollSpeed();
+    const catchR = glowRadius();
+    if (e.pickup) {
+      e.x += (e.vx || -sc * 0.7) * dt;
+      e.y += Math.sin(e.phase) * 10 * dt;
+      if (Math.hypot(e.x - kp.x, e.y - kp.y) < 42) grabPickup(e);
+      if (e.x < -60 || e.x > W + 80 || e.y < -40 || e.y > H + 40) e.alive = false;
+      return;
+    }
+    if (e.age < 0) return;
+    if (e.def.id === "gate-orb-weaver") {
+      e.x -= sc * 0.55 * dt;
+      const hx = Math.abs(kp.x - e.x);
+      if (e.webMode === "low") {
+        if (hx < (e.webLen || 34) && kp.y > e.y - 12) hitKeeper(e, "web");
+      } else if (hx < 12) {
+        const cy = kp.y - 40;
+        const inGap = Math.abs(cy - e.gap) < (e.gapW || 100) * 0.5;
+        if (!inGap) hitKeeper(e, "web");
+      }
+      if (e.x < -60 || e.x > W + 80) e.alive = false;
+      return;
+    }
+    if (e.magnet || (run.magnetT > 0 && e.kind !== "pest")) {
+      const dx = lp.x - e.x, dy = lp.y - e.y, dist = Math.hypot(dx, dy) || 1;
+      e.magSp = (e.magSp || 180) + 900 * dt;
+      e.vx = (dx / dist) * e.magSp; e.vy = (dy / dist) * e.magSp;
+      e.x += e.vx * dt; e.y += e.vy * dt;
+      if (dist < 18 && e.kind !== "pest") catchEnt(e);
+      return;
+    }
+    const left = -sc * (0.52 + (e.def.speedMul || 0.4) * 0.45);
+    e.x += (Math.abs(e.vx) > 30 ? e.vx : left) * dt;
+    if (e.kind === "aerial" || e.kind === "cliff") {
+      e.y += Math.sin(e.phase * (e.def.blink ? 2.2 : 1.2)) * 18 * dt;
+    } else if (e.kind === "ground") {
+      e.hopT += dt;
+      e.y = lerp(e.y, H * 0.82 - 8, 0.12);
+      if (e.def.hop) e.y -= Math.abs(Math.sin(e.hopT * 6)) * 36 * dt;
+    } else if (e.def.id === "fen-mosquito" || e.def.id === "paper-nest-wasp") {
+      e.y += Math.sin(e.phase * 2.4) * 22 * dt;
+      if (e.dodgeT > 0) { e.dodgeT -= dt; e.x += e.vx * dt; }
+    }
+    if (e.kind !== "pest") {
+      if (Math.hypot(e.x - lp.x, e.y - lp.y) < catchR + (e.def.r || 12)) catchEnt(e);
+      else if (e.kind === "ground" && Math.abs(e.x - kp.x) < 36 && Math.abs(e.y - kp.y) < 32) catchEnt(e);
+    } else if (Math.hypot(e.x - kp.x, e.y - (kp.y - 28)) < 26) {
+      hitKeeper(e, e.def.id === "fen-mosquito" ? "bite" : "sting");
+    }
+    if (e.x < -60 || e.x > W + 80 || e.y < -40 || e.y > H + 40) e.alive = false;
   }
 
   function updateFly(dt) {
@@ -694,6 +850,21 @@
     run.veilT = Math.max(0, run.veilT - dt);
     run.kindledT = Math.max(0, run.kindledT - dt);
     steering(dt);
+    if (isRidge()) {
+      keeper.facing = 1;
+      keeper.vy += 4.6 * H * dt;
+      keeper.y += keeper.vy * dt / H;
+      const floor = 0.82;
+      if (keeper.y >= floor) {
+        keeper.y = floor;
+        keeper.vy = 0;
+        keeper.grounded = true;
+        keeper.coyote = 0.1;
+      } else {
+        keeper.grounded = false;
+        keeper.coyote = Math.max(0, keeper.coyote - dt);
+      }
+    }
     keeper.pulseT += dt; keeper.pulseCd = Math.max(0, keeper.pulseCd - dt);
     keeper.glow = lerp(keeper.glow, 0.55 + run.wick * 0.16, 1 - Math.pow(0.08, dt));
     run.comboT = Math.max(0, run.comboT - dt);
@@ -702,26 +873,38 @@
     lastCatchT = Math.max(0, lastCatchT - dt);
 
     const kp = keeperPx(), lp = lanternPx();
-    if (Math.random() < dt * 10) burst(kp.x + rand(-8, 8), kp.y + 18, 1, { hue: 32, speed: 10, life: 0.5, size: 1.4, g: 30, drag: 0.95, ember: true });
+    if (Math.random() < dt * 2) burst(kp.x + rand(-8, 8), kp.y + 18, 1, { hue: 32, speed: 10, life: 0.5, size: 1.4, g: 30, drag: 0.95, ember: true });
 
     const heat = clamp(run.t / run.dur, 0, 1);
-    spawnAcc += dt * lerp(1.05, 1.9, heat);
-    const interval = lerp(0.68, 0.36, heat);
+    spawnAcc += dt;
+    const interval = Math.max(0.55, lerp(0.68, 0.55, heat));
     const aerials = SPEC.filter((s) => s.kind === "aerial");
     const grounds = SPEC.filter((s) => s.kind === "ground" || s.kind === "cliff");
     const pests = SPEC.filter((s) => s.kind === "pest");
     while (spawnAcc >= interval) {
       spawnAcc -= interval;
-      const x = W * 0.5 + rand(-W * 0.32, W * 0.32);
-      if (Math.random() < 0.6) spawnWeighted(aerials, x, rand(-40, H * 0.06));
-      else spawnWeighted(grounds, x, -30);
+      if (liveEnts() >= 18) { spawnAcc = 0; break; }
+      if (isRidge()) {
+        if (Math.random() < 0.6) spawnWeighted(aerials, W + 28, rand(H * 0.32, H * 0.58));
+        else spawnWeighted(grounds, W + 28, H * 0.82 - 6);
+      } else {
+        const x = W * 0.5 + rand(-W * 0.32, W * 0.32);
+        if (Math.random() < 0.6) spawnWeighted(aerials, x, rand(-40, H * 0.06));
+        else spawnWeighted(grounds, x, -30);
+      }
     }
-    if (run.t > 5) {
-      pestAcc += dt * lerp(0.4, 1.6, heat) * DIFF().pest;
-      const pInt = lerp(2.2, 0.9, heat) / Math.max(0.35, DIFF().pest);
+    if (run.t > 10) {
+      pestAcc += dt;
+      const pInt = Math.max(1.4, lerp(2.2, 1.4, heat) / Math.max(0.35, DIFF().pest));
       while (pestAcc >= pInt) {
         pestAcc -= pInt;
-        spawnWeighted(pests, W * 0.5 + rand(-W * 0.3, W * 0.3), -24);
+        if (liveEnts() >= 18) { pestAcc = 0; break; }
+        if (isRidge()) {
+          const high = Math.random() < 0.45;
+          spawnWeighted(pests, W + 32, high ? rand(H * 0.26, H * 0.40) : rand(H * 0.64, H * 0.76));
+        } else {
+          spawnWeighted(pests, W * 0.5 + rand(-W * 0.3, W * 0.3), -30);
+        }
       }
     }
     pickAcc += dt;
@@ -731,6 +914,7 @@
       const e = ents[i];
       if (!e.alive) { ents.splice(i, 1); continue; }
       e.age += dt; e.phase += dt * 5;
+      if (isRidge()) { updateRidgeEnt(e, dt, kp, lp); continue; }
       if (e.pickup) {
         e.y += e.vy * dt; e.x += Math.sin(e.phase) * 12 * dt;
         if (Math.hypot(e.x - kp.x, e.y - kp.y) < 42) grabPickup(e);
@@ -790,20 +974,25 @@
       }
     }
 
-    if (run.combo >= 5 && Math.random() < dt * 18) {
-      speedLines.push({ x: rand(0, W), y: rand(0, H * 0.6), len: rand(16, 40), a: 0.3, v: 380 });
+    if (run.combo >= 8 && speedLines.length < 6 && Math.random() < dt * 12) {
+      if (isRidge()) speedLines.push({ x: rand(W * 0.3, W), y: rand(H * 0.15, H * 0.75), len: rand(16, 40), a: 0.3, v: 380, horiz: true });
+      else speedLines.push({ x: rand(0, W), y: rand(0, H * 0.6), len: rand(16, 40), a: 0.3, v: 380 });
     }
     for (let i = speedLines.length - 1; i >= 0; i--) {
-      const s = speedLines[i]; s.y += s.v * dt; s.a -= dt * 0.8;
-      if (s.a <= 0 || s.y > H) speedLines.splice(i, 1);
+      const sl = speedLines[i];
+      if (sl.horiz) sl.x -= sl.v * dt; else sl.y += sl.v * dt;
+      sl.a -= dt * 0.8;
+      if (sl.a <= 0 || sl.y > H || sl.x < -40) speedLines.splice(i, 1);
     }
     if (run.t >= run.dur && !run.crashed) beginLand();
   }
 
   function updateLand(dt) {
     landT += dt;
+    keeper.bob += dt * 12;
     keeper.bank = lerp(keeper.bank, 0, dt * 3);
     keeper.vis = lerp(keeper.vis, 0, dt * 3);
+    if (isRidge()) { keeper.facing = 1; keeper.y = lerp(keeper.y, 0.82, dt * 6); keeper.vy = 0; }
     worldZ += dt * 4;
     if (landT > 1.5) openRoost(true);
   }
@@ -819,30 +1008,31 @@
     if (img) {
       const scale = Math.max(W / img.width, H / img.height) * 1.12;
       const dw = img.width * scale, dh = img.height * scale;
-      const ox = (W - dw) / 2;
-      const extra = Math.max(0, dh - H);
-      const oy = extra > 0 ? -((worldZ * 8) % extra) : (H - dh) / 2;
-      ctx.drawImage(img, ox, oy, dw, dh);
+      if (isRidge() && (state === STATE.FLY || state === STATE.LAND)) {
+        const extraX = Math.max(1, dw - W);
+        const pan = (worldZ * 10) % extraX;
+        const extraY = Math.max(0, dh - H);
+        const oy = extraY > 0 ? -extraY * 0.45 : (H - dh) / 2;
+        ctx.drawImage(img, -pan, oy, dw, dh);
+        if (dw - pan < W + 2) ctx.drawImage(img, -pan + extraX, oy, dw, dh);
+      } else {
+        const ox = (W - dw) / 2;
+        const extra = Math.max(0, dh - H);
+        const oy = extra > 0 ? -((worldZ * 8) % extra) : (H - dh) / 2;
+        ctx.drawImage(img, ox, oy, dw, dh);
+      }
     } else {
-      const g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, "#060414"); g.addColorStop(1, "#0a0816");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#0a0816";
+      ctx.fillRect(0, 0, W, H);
     }
-    ctx.fillStyle = "rgba(4,3,12,0.22)"; ctx.fillRect(0, 0, W, H);
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.beginPath();
-    for (let i = 0; i <= 24; i++) {
-      const yt = i / 24, y = yt * H;
-      const n = Math.sin(yt * 6 + worldZ * 0.15) * W * 0.04;
-      if (i) ctx.lineTo(W * 0.5 + n, y); else ctx.moveTo(W * 0.5 + n, y);
+    if (isRidge() && (state === STATE.FLY || state === STATE.LAND)) {
+      ctx.fillStyle = "rgba(10,8,14,0.5)";
+      ctx.fillRect(0, H * 0.80, W, H * 0.20);
+      ctx.fillStyle = "rgba(48,40,30,0.7)";
+      ctx.fillRect(0, H * 0.798, W, 3);
     }
-    ctx.strokeStyle = "rgba(255,186,90,0.14)"; ctx.lineWidth = 18; ctx.lineCap = "round"; ctx.stroke();
-    ctx.strokeStyle = "rgba(255,230,170,0.18)"; ctx.lineWidth = 3; ctx.stroke();
-    ctx.restore();
-    const vg = ctx.createLinearGradient(0, H * 0.55, 0, H);
-    vg.addColorStop(0, "rgba(8,6,16,0)"); vg.addColorStop(1, "rgba(6,4,12,0.55)");
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(6,4,12,0.42)";
+    ctx.fillRect(0, H * 0.84, W, H * 0.16);
   }
 
   function sheetCell(img, cols, rows, index) {
@@ -869,21 +1059,26 @@
   function drawMoth(e) {
     const look = MOTH_LOOK[e.def.id] || MOTH_LOOK["pale-wickmoth"];
     const tiny = !!look.tiny;
-    const flap = Math.sin(e.phase * (tiny ? 16 : 11));
+    const beat = tiny ? 18 : 13;
+    const flap = Math.sin(e.phase * beat);
     const span = (e.def.r || 12) * (tiny ? 0.72 : 1.05);
-    const wy = span * (0.38 + 0.32 * Math.abs(flap));
-    if (e.def.id === "pale-wickmoth" && assets.mothPale) {
-      const s = 40;
-      ctx.drawImage(assets.mothPale, -s / 2, -s / 2, s, s);
-      return;
-    }
-    ctx.fillStyle = look.wing;
-    ctx.beginPath();
-    ctx.ellipse(-span * 0.52, -1, span * 0.88, wy, -0.38 - flap * 0.22, 0, TAU);
-    ctx.fill();
+    const wy = span * (0.32 + 0.4 * Math.abs(flap));
+    const hy = span * (0.2 + 0.2 * Math.abs(flap));
+    const tilt = flap * 0.28;
+    ctx.translate(0, flap * 0.7);
     ctx.fillStyle = look.wing2 || look.wing;
     ctx.beginPath();
-    ctx.ellipse(span * 0.52, -1, span * 0.88, wy, 0.38 + flap * 0.22, 0, TAU);
+    ctx.ellipse(-span * 0.36, 2.2, span * 0.52, hy, -0.55 - tilt * 0.55, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(span * 0.36, 2.2, span * 0.52, hy, 0.55 + tilt * 0.55, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = look.wing;
+    ctx.beginPath();
+    ctx.ellipse(-span * 0.52, -1, span * 0.9, wy, -0.38 - tilt, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(span * 0.52, -1, span * 0.9, wy, 0.38 + tilt, 0, TAU);
     ctx.fill();
     if (look.flash && (e.def.id === "ash-vein-underwing" || e.def.id === "ember-hawkmoth") && flap > 0.2) {
       ctx.fillStyle = look.flash;
@@ -916,7 +1111,6 @@
     ctx.quadraticCurveTo(7, -span * 1.12, 9, -span * 1.22);
     ctx.stroke();
   }
-
   function drawGroundBug(e) {
     const r = e.def.r || 12;
     ctx.fillStyle = hsl(e.def.hue, 32, 26);
@@ -940,44 +1134,110 @@
       }
     }
     if (e.def.id === "bank-glowworm") {
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.fillStyle = hsl(95, 90, 60, 0.55);
+      ctx.fillStyle = "rgba(140, 230, 110, 0.7)";
       ctx.beginPath(); ctx.arc(r * 0.3, 0, 4, 0, TAU); ctx.fill();
-      ctx.restore();
     }
   }
 
   function drawPestVector(e) {
-    if (e.def.id === "fen-mosquito") {
-      ctx.strokeStyle = "#2a3230"; ctx.lineWidth = 0.8;
+    const id = e.def.id;
+    if (id === "fen-mosquito") {
+      const sc = (e.def.r || 13) / 12;
+      ctx.strokeStyle = "#2a2c30";
+      ctx.lineWidth = 0.85 * sc;
+      ctx.lineCap = "round";
       for (let i = 0; i < 6; i++) {
-        const a = -0.5 + i * 0.18;
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * 13, Math.sin(a) * 9); ctx.stroke();
+        const a = -0.75 + i * 0.24;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(a) * 16 * sc, Math.sin(a) * 11 * sc);
+        ctx.stroke();
       }
-      ctx.fillStyle = "#3a4448";
-      ctx.beginPath(); ctx.ellipse(0, 0, 3.6, 6.5, 0.15, 0, TAU); ctx.fill();
-    } else if (e.def.id === "paper-nest-wasp") {
+      ctx.strokeStyle = "#8a2a6a";
+      ctx.lineWidth = 1.7 * sc;
+      ctx.beginPath();
+      ctx.ellipse(0, 1 * sc, 4.2 * sc, 9.6 * sc, 0.2, 0, TAU);
+      ctx.stroke();
+      ctx.fillStyle = "#1c1e22";
+      ctx.beginPath();
+      ctx.ellipse(0, 1 * sc, 3.3 * sc, 8.6 * sc, 0.2, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#141518";
+      ctx.beginPath(); ctx.arc(-1 * sc, -8 * sc, 2.7 * sc, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "#4a1828";
+      ctx.lineWidth = 1.2 * sc;
+      ctx.beginPath();
+      ctx.moveTo(-1 * sc, -10 * sc);
+      ctx.lineTo(-2 * sc, -23 * sc);
+      ctx.stroke();
+      ctx.strokeStyle = "#c44a7a";
+      ctx.lineWidth = 0.7 * sc;
+      ctx.beginPath();
+      ctx.moveTo(-1 * sc, -10 * sc);
+      ctx.lineTo(-2 * sc, -23 * sc);
+      ctx.stroke();
+    } else if (id === "paper-nest-wasp") {
+      const sc = (e.def.r || 18) / 14;
+      ctx.fillStyle = "rgba(190,200,210,0.38)";
+      ctx.beginPath(); ctx.ellipse(-11 * sc, -3 * sc, 10 * sc, 4 * sc, -0.45, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(11 * sc, -3 * sc, 10 * sc, 4 * sc, 0.45, 0, TAU); ctx.fill();
       ctx.fillStyle = "#e8c84a";
-      ctx.beginPath(); ctx.ellipse(0, 2, 5, 8, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = "#1a1814";
-      ctx.fillRect(-5, -1, 10, 2.4); ctx.fillRect(-5, 5, 10, 2);
-      ctx.beginPath(); ctx.ellipse(0, -6, 3.8, 3.8, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = "rgba(40,40,40,0.4)";
-      ctx.beginPath(); ctx.ellipse(-8, -2, 7, 3, -0.4, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(8, -2, 7, 3, 0.4, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 4 * sc, 6.6 * sc, 10.2 * sc, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#12100c";
+      ctx.fillRect(-6.6 * sc, -1.2 * sc, 13.2 * sc, 2.5 * sc);
+      ctx.fillRect(-6.3 * sc, 3.0 * sc, 12.6 * sc, 2.5 * sc);
+      ctx.fillRect(-5.6 * sc, 7.2 * sc, 11.2 * sc, 2.3 * sc);
+      ctx.beginPath(); ctx.ellipse(0, -7.2 * sc, 5.1 * sc, 5.1 * sc, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#e8c84a";
+      ctx.fillRect(-4.8 * sc, -8.4 * sc, 9.6 * sc, 1.8 * sc);
+      ctx.strokeStyle = "#12100c";
+      ctx.lineWidth = 1.3 * sc;
+      ctx.beginPath(); ctx.moveTo(0, 13.5 * sc); ctx.lineTo(0, 18.5 * sc); ctx.stroke();
     } else {
-      ctx.fillStyle = "#6a4a32";
-      ctx.beginPath(); ctx.ellipse(0, 2, 7, 8, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = "#3a2818";
-      ctx.beginPath(); ctx.arc(0, -4, 4, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#1a1410";
+      ctx.beginPath(); ctx.ellipse(0, 2, 8, 7, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, -5, 4.5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "#1a1410";
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = "round";
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 4; i++) {
+          const a = -0.45 + i * 0.32;
+          ctx.beginPath();
+          ctx.moveTo(side * 6, 0);
+          ctx.quadraticCurveTo(side * 14, a * 16, side * 18, a * 18);
+          ctx.stroke();
+        }
+      }
     }
+  }
+
+  function drawPestPip(yOff) {
+    const y = yOff == null ? -22 : yOff;
+    ctx.fillStyle = "#e03a32";
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(-4.6, y - 8);
+    ctx.lineTo(4.6, y - 8);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawNectarPip(r) {
+    ctx.fillStyle = "rgba(255,232,170,0.9)";
+    ctx.beginPath();
+    ctx.arc(r * 0.95, -r * 0.85, 2.05, 0, TAU);
+    ctx.fill();
   }
 
   function drawSpecimen(def, phase) {
     const e = { def: def, phase: phase || 0 };
-    if (def.sheet === "moths") drawMoth(e);
-    else if (def.sheet === "ground") drawGroundBug(e);
+    if (def.sheet === "moths") {
+      if (def.id === "pale-wickmoth" && assets.mothPale) {
+        const sz = 40;
+        ctx.drawImage(assets.mothPale, -sz / 2, -sz / 2, sz, sz);
+      } else drawMoth(e);
+    } else if (def.sheet === "ground") drawGroundBug(e);
     else if (def.id === "fen-mosquito" && assets.pestMosquito) ctx.drawImage(assets.pestMosquito, -20, -20, 40, 40);
     else if (def.id === "paper-nest-wasp" && assets.pestWasp) ctx.drawImage(assets.pestWasp, -20, -20, 40, 40);
     else drawPestVector(e);
@@ -986,42 +1246,75 @@
   function drawEnt(e) {
     if (e.age < 0 || !e.alive) return;
     if (e.pickup) { drawPickup(e); return; }
-    if (e.def.id === "gate-orb-weaver") {
+    const weaver = e.def && e.def.id === "gate-orb-weaver";
+    if (weaver) {
+      if (isRidge()) {
+        if (e.x < -40 || e.x > W + 40) return;
+      } else if (e.y < -30 || e.y > H + 20) return;
+    } else {
+      if (e.y < -30 || e.y > H + 20) return;
+      if (e.x < -40 || e.x > W + 40) return;
+    }
+    if (weaver) {
       ctx.save();
-      ctx.strokeStyle = "rgba(220,200,170,0.55)"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(0, e.y); ctx.lineTo(e.gap - e.gapW * 0.5, e.y); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(e.gap + e.gapW * 0.5, e.y); ctx.lineTo(W, e.y); ctx.stroke();
-      ctx.save();
-      ctx.translate(e.gap - e.gapW * 0.5, e.y);
-      drawPestVector(e);
-      ctx.restore();
+      ctx.strokeStyle = "#f3ead4";
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = "round";
+      if (isRidge() && e.webMode === "vert") {
+        ctx.beginPath(); ctx.moveTo(e.x, 0); ctx.lineTo(e.x, e.gap - e.gapW * 0.5); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(e.x, e.gap + e.gapW * 0.5); ctx.lineTo(e.x, H); ctx.stroke();
+        ctx.save();
+        ctx.translate(e.x, e.gap - e.gapW * 0.5);
+        drawPestVector(e);
+        if (e.x >= 0 && e.x <= W) drawPestPip(-16);
+        ctx.restore();
+      } else if (isRidge() && e.webMode === "low") {
+        const half = (e.webLen || 34);
+        ctx.beginPath(); ctx.moveTo(e.x - half, e.y); ctx.lineTo(e.x + half, e.y); ctx.stroke();
+        ctx.save();
+        ctx.translate(e.x + half * 0.7, e.y);
+        drawPestVector(e);
+        if (e.x >= 0 && e.x <= W) drawPestPip(-16);
+        ctx.restore();
+      } else {
+        ctx.beginPath(); ctx.moveTo(0, e.y); ctx.lineTo(e.gap - e.gapW * 0.5, e.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(e.gap + e.gapW * 0.5, e.y); ctx.lineTo(W, e.y); ctx.stroke();
+        ctx.save();
+        ctx.translate(e.gap - e.gapW * 0.5, e.y);
+        drawPestVector(e);
+        if (e.y >= 0 && e.y <= H) drawPestPip(-16);
+        ctx.restore();
+      }
       ctx.restore();
       return;
     }
     const fade = e.y > H - 30 ? 1 - (e.y - (H - 30)) / 70 : 1;
     ctx.save(); ctx.translate(e.x, e.y); ctx.globalAlpha = clamp(fade, 0, 1);
-    ctx.save(); ctx.globalCompositeOperation = "lighter";
-    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, e.def.r * 3.2);
-    const blinkOff = e.def.blink && Math.sin(e.phase * 6) < 0;
-    glow.addColorStop(0, hsl(e.def.hue, 80, 62, blinkOff ? 0.08 : 0.45));
-    glow.addColorStop(1, hsl(e.def.hue, 80, 50, 0));
-    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, e.def.r * 3.2, 0, TAU); ctx.fill();
-    ctx.restore();
-
-    if (e.def.sheet === "moths") {
-      drawMoth(e);
-    } else if (e.def.sheet === "ground") {
-      drawGroundBug(e);
-    } else if (e.def.id === "fen-mosquito" && assets.pestMosquito) {
-      ctx.drawImage(assets.pestMosquito, -20, -20, 40, 40);
-    } else if (e.def.id === "paper-nest-wasp" && assets.pestWasp) {
-      ctx.drawImage(assets.pestWasp, -20, -20, 40, 40);
-    } else if (e.def.sheet === "pests") {
-      drawPestVector(e);
-    } else {
+    const pest = e.kind === "pest" || (e.def && e.def.threat);
+    if (!pest) {
+      const blinkOff = e.def.blink && Math.sin(e.phase * 6) < 0;
+      if (e.def.blink) {
+        if (!blinkOff) {
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          ctx.fillStyle = "rgba(160,255,120,0.4)";
+          ctx.beginPath(); ctx.arc(0, 0, e.def.r * 2.2, 0, TAU); ctx.fill();
+          ctx.restore();
+        }
+      } else {
+        ctx.fillStyle = "rgba(255,214,130,0.32)";
+        ctx.beginPath(); ctx.arc(0, 0, e.def.r * 2.35, 0, TAU); ctx.fill();
+      }
+    }
+    if (e.def.sheet === "moths") drawMoth(e);
+    else if (e.def.sheet === "ground") drawGroundBug(e);
+    else if (e.def.sheet === "pests") drawPestVector(e);
+    else {
       ctx.fillStyle = hsl(e.def.hue, 80, 60, 0.85);
       ctx.beginPath(); ctx.ellipse(0, 0, e.def.r * 1.3, e.def.r * 0.7, Math.sin(e.phase) * 0.3, 0, TAU); ctx.fill();
     }
+    if (!pest) drawNectarPip(e.def.r || 12);
+    else if (e.x >= 0 && e.x <= W && e.y >= 0 && e.y <= H) drawPestPip(e.def.id === "fen-mosquito" ? -26 : -20);
     ctx.restore();
   }
 
@@ -1040,14 +1333,95 @@
     ctx.restore();
   }
 
+  function drawRangerWalk() {
+    const air = isRidge() && !keeper.grounded;
+    const amp = keeper.stagger > 0 ? 0.28 : air ? 0.22 : 1;
+    const swing = Math.sin(keeper.bob);
+    const coat = -swing * 10 * amp;
+    const headBob = air ? 0 : -Math.abs(swing) * 2.4;
+    const arm = Math.sin(keeper.bob + 0.45) * 9 * (air ? 0.35 : amp);
+    const lx = air ? -3 : -5 + swing * 18 * amp;
+    const rx = air ? 5 : 5 - swing * 18 * amp;
+    const fy = air ? 5 : 10;
+    const ky = air ? -7 : -8 + Math.abs(swing) * 3;
+    const lkx = air ? -4 : -5 + swing * 7 * amp;
+    const rkx = air ? 4 : 5 - swing * 7 * amp;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#1c1a16";
+    ctx.lineWidth = 5.5;
+    ctx.beginPath(); ctx.moveTo(-5, -22); ctx.lineTo(lkx, ky); ctx.lineTo(lx, fy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(5, -22); ctx.lineTo(rkx, ky); ctx.lineTo(rx, fy); ctx.stroke();
+    ctx.fillStyle = "#14120e";
+    ctx.beginPath(); ctx.ellipse(lx + 3, fy + 2, 7, 3, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(rx + 3, fy + 2, 7, 3, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "#2a3326";
+    ctx.lineWidth = 4.2;
+    ctx.beginPath();
+    ctx.moveTo(-11, -52);
+    ctx.lineTo(-14 - swing * 8 * amp, -28);
+    ctx.stroke();
+    ctx.fillStyle = "#2b3428";
+    ctx.beginPath();
+    ctx.moveTo(-15, -60 + headBob * 0.2);
+    ctx.lineTo(14, -60 + headBob * 0.2);
+    ctx.lineTo(17 + coat * 0.25, -18);
+    ctx.quadraticCurveTo(coat * 0.5, -8, -17 + coat, -18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#1e261c";
+    ctx.beginPath();
+    ctx.moveTo(-16 + coat * 0.4, -24);
+    ctx.lineTo(16 + coat * 0.2, -24);
+    ctx.lineTo(18 + coat * 0.3, -12);
+    ctx.quadraticCurveTo(coat, -6, -18 + coat, -12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#3a4434";
+    ctx.beginPath();
+    ctx.moveTo(-10, -60);
+    ctx.lineTo(10, -60);
+    ctx.lineTo(7, -52);
+    ctx.lineTo(-7, -52);
+    ctx.closePath();
+    ctx.fill();
+    const hy = -72 + headBob;
+    ctx.fillStyle = "#c4a07a";
+    ctx.beginPath(); ctx.arc(1, hy, 9, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#161812";
+    ctx.beginPath(); ctx.ellipse(1, hy - 5, 17, 3.6, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(1, hy - 11, 8.5, 6.5, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "#2a3326";
+    ctx.lineWidth = 4.2;
+    ctx.beginPath();
+    ctx.moveTo(10, -52);
+    ctx.lineTo(24 + arm * 0.25, -48 + arm * 0.55);
+    ctx.stroke();
+  }
   function drawKeeper() {
     const kp = keeperPx();
     const lp = lanternPx();
+    let squash = 0, stretch = 0;
+    if (isRidge()) {
+      if (!keeper.grounded) {
+        keeper._air = 1;
+        if (keeper.vy < 0) stretch = Math.min(1, -keeper.vy / 920);
+      } else if (keeper._air) {
+        keeper._air = 0;
+        keeper._landT = time;
+      }
+      if (keeper._landT != null) {
+        const land = Math.max(0, 1 - (time - keeper._landT) / 0.12);
+        squash = land * land;
+        if (squash <= 0) keeper._landT = null;
+      }
+    }
+    const sx = 1 + squash * 0.28 - stretch * 0.12;
+    const sy = 1 - squash * 0.32 + stretch * 0.22;
     ctx.save();
     ctx.translate(kp.x, kp.y);
     ctx.rotate(keeper.roll);
-    const bob = Math.sin(keeper.bob) * 2.2;
-    ctx.translate(0, bob);
+    ctx.scale(sx, sy);
     if (run.invuln > 0 && ((time * 18) | 0) % 2 === 0) ctx.globalAlpha = 0.5;
     if (run.aegisT > 0) {
       ctx.save(); ctx.globalCompositeOperation = "lighter";
@@ -1059,36 +1433,42 @@
       ctx.fillStyle = "rgba(40,36,48,0.28)";
       ctx.beginPath(); ctx.ellipse(0, -10, 40, 50, 0, 0, TAU); ctx.fill();
     }
-    const img = assets.keeper;
-    const h = 118, w = h * (img ? img.width / img.height : 0.7);
     ctx.save();
     ctx.scale(keeper.facing, 1);
-    if (img) ctx.drawImage(img, -w * 0.48, -h + 18, w, h);
-    else {
-      ctx.fillStyle = "#3a4a38"; ctx.fillRect(-16, -50, 32, 60);
-      ctx.fillStyle = "#c9a070"; ctx.beginPath(); ctx.arc(0, -60, 12, 0, TAU); ctx.fill();
-    }
+    drawRangerWalk();
     ctx.restore();
     ctx.fillStyle = "rgba(0,0,0,0.28)";
-    ctx.beginPath(); ctx.ellipse(0, 16, 22, 6, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 16, 22 * (1 + squash * 0.35), 6, 0, 0, TAU); ctx.fill();
     ctx.restore();
 
     ctx.save();
     ctx.translate(lp.x, lp.y);
     const flick = 0.9 + 0.1 * Math.sin(time * 14);
     ctx.save(); ctx.globalCompositeOperation = "lighter";
-    const gR = 54 * keeper.glow * flick;
+    const gR = (isRidge() && state === STATE.FLY ? 44 : 54) * keeper.glow * flick;
     const g = ctx.createRadialGradient(0, 0, 2, 0, 0, gR);
     g.addColorStop(0, `rgba(255,236,180,${0.55 * keeper.glow})`);
     g.addColorStop(0.35, `rgba(255,180,80,${0.22 * keeper.glow})`);
     g.addColorStop(1, "rgba(255,80,20,0)");
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, gR, 0, TAU); ctx.fill();
     ctx.restore();
-    const lan = assets.lantern;
-    if (lan) ctx.drawImage(lan, -16, -22, 32, 32 * (lan.height / lan.width));
+    ctx.rotate(Math.sin(keeper.bob + 0.45) * 0.12 * (keeper.stagger > 0 ? 0.3 : 1));
+    ctx.fillStyle = "#3a2a18";
+    ctx.fillRect(-5, -14, 10, 4);
+    ctx.fillStyle = "#c4a060";
+    ctx.beginPath(); ctx.arc(0, -12, 5.5, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = "rgba(255,232,160,0.72)";
+    ctx.beginPath(); ctx.ellipse(0, -2, 6.5, 8.5, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "#8a6a38";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.fillStyle = "#2a2218";
+    ctx.fillRect(-2.2, -16, 4.4, 3);
+    ctx.strokeStyle = "#c4a060";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(-4, -14); ctx.quadraticCurveTo(0, -20, 4, -14); ctx.stroke();
     ctx.restore();
   }
-
   function drawPulseRings() {
     ctx.save(); ctx.globalCompositeOperation = "lighter";
     for (let i = pulseRings.length - 1; i >= 0; i--) {
@@ -1157,12 +1537,17 @@
       ctx.fillText(buffs.join("  ·  "), W / 2, H - 22);
     }
     ctx.restore();
-    if (state === STATE.FLY && (teachTap || teachHold)) {
+    if (state === STATE.FLY && run.t < 6) {
+      ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,230,190,0.85)";
+      ctx.font = "600 13px ui-sans-serif, system-ui, sans-serif";
+      ctx.globalAlpha = 0.55 + 0.2 * Math.sin(time * 4);
+      ctx.fillText(isRidge() ? "tap  jump     gold  catch     red  dodge" : "gold glow  catch     red  dodge", W / 2, H * 0.88);
+      ctx.restore();
+    } else if (state === STATE.FLY && (teachTap || teachHold) && !isRidge()) {
       ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,230,190,0.8)";
       ctx.font = "600 13px ui-sans-serif, system-ui, sans-serif";
       ctx.globalAlpha = 0.4 + 0.25 * Math.sin(time * 5);
-      if (run.t < 3.2 && teachTap) ctx.fillText("TAP  ·  swing lantern", W / 2, H * 0.88);
-      else if (run.t < 8 && teachHold) ctx.fillText("DRAG  ·  strafe the trail", W / 2, H * 0.88);
+      if (run.t < 8 && teachHold) ctx.fillText("DRAG  ·  strafe the trail", W / 2, H * 0.88);
       ctx.restore();
       if (run.t > 8) { teachTap = false; teachHold = false; }
     }
@@ -1240,41 +1625,57 @@
     const barW = W * 0.5, bx = (W - barW) / 2, by = H * 0.142;
     ctx.fillStyle = "rgba(232,234,237,0.12)"; rr(bx, by, barW, 6, 3); ctx.fill();
     ctx.fillStyle = "rgba(232,234,237,0.55)"; rr(bx, by, barW * (xpInto() / 70), 6, 3); ctx.fill();
+    const pillY = H * 0.372, pillH = 44;
     const kimg = assets.keeper;
-    if (kimg) ctx.drawImage(kimg, W / 2 - 48, H * 0.145, 96, 96 * (kimg.height / kimg.width));
-    panelScrim(W * 0.08, H * 0.385, W * 0.84, H * 0.09);
+    if (kimg) {
+      const kTop = H * 0.152;
+      const kMaxH = Math.max(24, pillY - kTop - 10);
+      let kh = Math.min(kMaxH, 48);
+      let kw = kh * (kimg.width / kimg.height);
+      if (kw > 72) { kw = 72; kh = kw * (kimg.height / kimg.width); }
+      if (kh > kMaxH) { kh = kMaxH; kw = kh * (kimg.width / kimg.height); }
+      ctx.drawImage(kimg, W / 2 - kw / 2, kTop, kw, kh);
+    }
+    panelScrim(W * 0.08, H * 0.338, W * 0.84, H * 0.172);
     ctx.fillStyle = "rgba(232,234,237,0.55)"; ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
-    ctx.fillText("difficulty", W / 2, H * 0.40);
+    ctx.fillText("trail", W / 2, H * 0.358);
+    const vw = W * 0.40, vg = W * 0.024, vx0 = (W - (vw * 2 + vg)) / 2;
+    pill("view:path", vx0, pillY, vw, pillH, "PATH", save.view !== "ridge");
+    pill("view:ridge", vx0 + vw + vg, pillY, vw, pillH, "RIDGE", save.view === "ridge");
+    ctx.fillStyle = "rgba(232,234,237,0.55)"; ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText("difficulty", W / 2, pillY + pillH + 16);
     const diffs = ["watch", "keep", "ember"];
-    const dw = W * 0.26, gap = W * 0.03, x0 = (W - (dw * 3 + gap * 2)) / 2;
+    const dww = W * 0.26, gap = W * 0.03, x0 = (W - (dww * 3 + gap * 2)) / 2;
     diffs.forEach((id, i) => {
       const D = DIFFS[id];
-      pill("diff:" + id, x0 + i * (dw + gap), H * 0.415, dw, 36, D.name + "  " + D.wick + " wick", save.difficulty === id);
+      pill("diff:" + id, x0 + i * (dww + gap), pillY + pillH + 26, dww, 32, D.name + "  " + D.wick + " wick", save.difficulty === id);
     });
-    panelScrim(W * 0.08, H * 0.485, W * 0.84, H * 0.175);
+    panelScrim(W * 0.08, H * 0.53, W * 0.84, H * 0.155);
     ctx.fillStyle = "rgba(232,234,237,0.55)"; ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
-    ctx.fillText("loadout  ·  tap to toggle", W / 2, H * 0.50);
+    ctx.fillText("loadout  ·  tap to toggle", W / 2, H * 0.548);
     ABILITIES.forEach((a, i) => {
       const cw = W * 0.28, cg = W * 0.03, ax = (W - (cw * 3 + cg * 2)) / 2 + i * (cw + cg);
       const on = !!save.equipped[a.id];
-      rr(ax, H * 0.515, cw, H * 0.13, 10);
+      rr(ax, H * 0.56, cw, H * 0.11, 10);
       ctx.fillStyle = on ? "#3a3224" : "#1a1d24";
       ctx.strokeStyle = "#3c4043";
       ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
       ctx.fillStyle = on ? "#e8eaed" : "#c5c8ce"; ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
-      ctx.fillText(a.name, ax + cw / 2, H * 0.545);
+      ctx.fillText(a.name, ax + cw / 2, H * 0.585);
       ctx.font = "10px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.55)";
-      wrapText(a.sub, ax + cw / 2, H * 0.57, cw - 10, 12);
+      wrapText(a.sub, ax + cw / 2, H * 0.608, cw - 10, 12);
       ctx.fillStyle = "rgba(232,234,237,0.45)"; ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
-      ctx.fillText("chip " + (save.chips[a.id] || 0), ax + cw / 2, H * 0.625);
-      addHit("ab:" + a.id, ax, H * 0.515, cw, H * 0.13);
+      ctx.fillText("chip " + (save.chips[a.id] || 0), ax + cw / 2, H * 0.652);
+      addHit("ab:" + a.id, ax, H * 0.56, cw, H * 0.11);
     });
-    pill("play", W * 0.18, H * 0.68, W * 0.64, 48, "play  Night Canyon", true);
-    pill("map", W * 0.08, H * 0.78, W * 0.4, 40, "campaign", false);
-    pill("trophy", W * 0.52, H * 0.78, W * 0.4, 40, "trophy room", false);
-    ctx.font = "11px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.35)";
-    ctx.fillText("TAP pulse  ·  DRAG strafe  ·  A/D  ·  Space", W / 2, H * 0.88);
-    ctx.fillText("Reed Marsh · Cliff Garden · Sky-Ruins locked", W / 2, H * 0.91);
+    pill("play", W * 0.18, H * 0.695, W * 0.64, 44, "play  Night Canyon", true);
+    pill("map", W * 0.08, H * 0.775, W * 0.4, 38, "campaign", false);
+    pill("trophy", W * 0.52, H * 0.775, W * 0.4, 38, "trophy room", false);
+    ctx.font = "11px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.55)";
+    ctx.fillText("1 Path  ·  2 Ridge  ·  Space play", W / 2, H * 0.855);
+    ctx.fillStyle = "rgba(232,234,237,0.35)";
+    ctx.fillText(isRidge() ? "TAP jump  ·  swipe up  ·  A/D  ·  Space" : "TAP pulse  ·  DRAG strafe  ·  A/D  ·  Space", W / 2, H * 0.885);
+    ctx.fillText("Reed Marsh · Cliff Garden · Sky-Ruins locked", W / 2, H * 0.915);
     ctx.restore();
   }
 
@@ -1409,7 +1810,12 @@
       drawCanyon();
       if (speedLines.length) {
         ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = "rgba(255,230,200,0.16)"; ctx.lineWidth = 1;
-        for (const s of speedLines) { ctx.globalAlpha = s.a; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x, s.y + s.len); ctx.stroke(); }
+        for (const s of speedLines) {
+          ctx.globalAlpha = s.a; ctx.beginPath();
+          if (s.horiz) { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.len, s.y); }
+          else { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x, s.y + s.len); }
+          ctx.stroke();
+        }
         ctx.restore();
       }
       if (state === STATE.FLY || state === STATE.LAND || state === STATE.TITLE) {

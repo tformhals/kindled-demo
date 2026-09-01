@@ -8,8 +8,8 @@
     "nectar": 4,
     "speed": 165,
     "catchWindow": 2.4,
-    "weakness": "Hold a still beam; they lock on the glass and sit.",
-    "notes": "Treats the chimney like a second moon.",
+    "weakness": "Still lantern. They lock on the glass and sit.",
+    "notes": "Common as chimney dust. Slow. First moth of the night.",
     "threat": false
   },
   {
@@ -21,8 +21,8 @@
     "nectar": 9,
     "speed": 190,
     "catchWindow": 2.0,
-    "weakness": "Cover the lantern; they stall when the lure dies.",
-    "notes": "Hindwings flash soot-gray, then vanish on bark.",
+    "weakness": "Darken the lamp a beat. They stall.",
+    "notes": "Hindwings flash ash, then bark. Lost them twice on one trunk.",
     "threat": false
   },
   {
@@ -34,8 +34,8 @@
     "nectar": 5,
     "speed": 175,
     "catchWindow": 2.2,
-    "weakness": "Smoke from a snuffed wick.",
-    "notes": "Drinks dew off grass; nets easy if you kneel.",
+    "weakness": "Smoke off a snuffed wick. They drop.",
+    "notes": "Drinks dew off the blades. Low. Wait; don't chase.",
     "threat": false
   },
   {
@@ -47,8 +47,8 @@
     "nectar": 18,
     "speed": 210,
     "catchWindow": 1.6,
-    "weakness": "Drop the shutter; they overshoot a dying light.",
-    "notes": "Hovers at the lantern lip; wait for the sip.",
+    "weakness": "Dim the lamp. They overshoot and hang.",
+    "notes": "Hovers at the lip. Wait for the sip. Rare. Don't rush.",
     "threat": false
   },
   {
@@ -60,8 +60,8 @@
     "nectar": 8,
     "speed": 140,
     "catchWindow": 2.5,
-    "weakness": "Outshine their flash; your lantern wins the courtship.",
-    "notes": "Males blink a slow two-count over wet ground; the steady green beads are females, leave them.",
+    "weakness": "Hold a steady lamp. Males come to the brighter flash.",
+    "notes": "Two-count blink is male. Steady green bead is female. Leave her.",
     "threat": false
   },
   {
@@ -73,8 +73,8 @@
     "nectar": 6,
     "speed": 90,
     "catchWindow": 2.8,
-    "weakness": "Chimney heat; they bolt from warm soil.",
-    "notes": "Patrols the path after rain; clicks if you pinch too hard.",
+    "weakness": "Lamp heat. They bolt from warm soil. Pin the run.",
+    "notes": "After rain, on the packed trail. Clicks if you grip too hard.",
     "threat": false
   },
   {
@@ -86,8 +86,8 @@
     "nectar": 7,
     "speed": 160,
     "catchWindow": 1.8,
-    "weakness": "Sudden full beam; they freeze, then ricochet.",
-    "notes": "Antennae longer than the body; follows the cool of stone.",
+    "weakness": "Sudden full beam. Freeze, then ricochet. Pin the freeze.",
+    "notes": "Antennae longer than the body. Follows cool stone, not the lamp.",
     "threat": false
   },
   {
@@ -99,8 +99,8 @@
     "nectar": 16,
     "speed": 260,
     "catchWindow": 1.2,
-    "weakness": "Sidestep, then pin; they charge the light in a straight line.",
-    "notes": "Too fast to net from the front; wait for the halt.",
+    "weakness": "Charges the lamp in a line. Sidestep, then pin the halt.",
+    "notes": "Fastest thing on the salt. Don't meet it head-on.",
     "threat": false
   },
   {
@@ -112,8 +112,8 @@
     "nectar": 14,
     "speed": 20,
     "catchWindow": 3.0,
-    "weakness": "Shade the lantern; your glow steals their lure.",
-    "notes": "Wingless female, a green bead in the grass; not a spark, don't pocket it dry.",
+    "weakness": "Shade your lamp. Her glow is the lure; yours washes it out.",
+    "notes": "Wingless female. Green bead in the bank grass. Don't pocket her dry.",
     "threat": false
   },
   {
@@ -125,8 +125,8 @@
     "nectar": 0,
     "speed": 220,
     "catchWindow": 1.5,
-    "weakness": "Heat and smoke of the lantern; they peel off the plume.",
-    "notes": "Hunts ears and wrists; one will call ten.",
+    "weakness": "Lamp heat and smoke. They peel off. Don't swat.",
+    "notes": "Ears and wrists. One calls ten. Keep walking.",
     "threat": true
   },
   {
@@ -138,8 +138,8 @@
     "nectar": 0,
     "speed": 240,
     "catchWindow": 1.4,
-    "weakness": "Smoke and back off; never swing.",
-    "notes": "Paper nest under eaves; a strike makes the whole porch yours to lose.",
+    "weakness": "Smoke. Back off. Never swing.",
+    "notes": "Grey paper under the eaves. Hit one and the nest comes too.",
     "threat": true
   },
   {
@@ -151,8 +151,8 @@
     "nectar": 0,
     "speed": 40,
     "catchWindow": 2.6,
-    "weakness": "Pluck a radial thread, lantern behind you.",
-    "notes": "Rebuilds the same gate every dusk; walk through and you'll wear her.",
+    "weakness": "Lamp behind you. Pluck a radial. Don't walk the web.",
+    "notes": "Same gate every dusk. Walk it and you carry her home.",
     "threat": true
   }
 ]
