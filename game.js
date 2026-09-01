@@ -1,4 +1,4 @@
-/* KINDLED — grounded keeper web slice. PATH: TAP pulse / DRAG strafe. RIDGE: TAP jump. */
+/* KINDLED — grounded keeper web slice. PATH: TAP pulse (catch+snap pests) / DRAG strafe. RIDGE: swipe-up jump / tap or swipe-down snap. */
 (() => {
   "use strict";
 
@@ -11,6 +11,8 @@
   const FIB = [1, 2, 3, 5, 8, 12, 18, 24, 36];
   const TAP_MS = 180;
   const MOVE_PX = 12;
+  const PEST_INTERVAL_MIN = 1.4;
+  const PEST_LIVE_CAP = 3;
 
 
   const PLAY = {
@@ -40,6 +42,9 @@
     });
   });
   const SPEC_BY = Object.fromEntries(SPEC.map((s) => [s.id, s]));
+  const AERIALS = SPEC.filter((s) => s.kind === "aerial");
+  const GROUNDS = SPEC.filter((s) => s.kind === "ground" || s.kind === "cliff");
+  const PESTS = SPEC.filter((s) => s.kind === "pest");
 
   const ABILITIES = [
     { id: "wide", name: "Wide Pulse", sub: "Magnet radius +38%", chip: "pulse radius" },
@@ -204,8 +209,44 @@
   function vibe(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} }
 
   let W = 405, H = 720, dpr = 1;
+  const assets = { ready: false };
+  const canyonCache = { cv: null, dw: 0, dh: 0 };
+  let lanternGlowCv = null;
+  function rebuildCanyonCache() {
+    const img = assets.canyon;
+    if (!img || W < 1 || H < 1) return;
+    const scale = Math.max(W / img.width, H / img.height) * 1.12;
+    const dw = Math.max(1, Math.round(img.width * scale));
+    const dh = Math.max(1, Math.round(img.height * scale));
+    if (canyonCache.cv && canyonCache.dw === dw && canyonCache.dh === dh) return;
+    const c = document.createElement("canvas");
+    c.width = dw;
+    c.height = dh;
+    const x = c.getContext("2d", { alpha: false });
+    x.drawImage(img, 0, 0, dw, dh);
+    canyonCache.cv = c;
+    canyonCache.dw = dw;
+    canyonCache.dh = dh;
+  }
+  function lanternGlowSheet() {
+    if (lanternGlowCv) return lanternGlowCv;
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 64;
+    const x = c.getContext("2d");
+    const g = x.createRadialGradient(32, 32, 1, 32, 32, 32);
+    g.addColorStop(0, "rgba(255,236,180,0.7)");
+    g.addColorStop(0.4, "rgba(255,180,80,0.28)");
+    g.addColorStop(1, "rgba(255,80,20,0)");
+    x.fillStyle = g;
+    x.beginPath();
+    x.arc(32, 32, 32, 0, TAU);
+    x.fill();
+    lanternGlowCv = c;
+    return c;
+  }
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 500 ? 1.5 : 1.75);
+    dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 900 ? 1.25 : 1.5);
     const vw = window.innerWidth, vh = window.innerHeight, aspect = 9 / 16;
     let cssW, cssH;
     if (vw / vh > aspect) { cssH = vh; cssW = vh * aspect; }
@@ -216,6 +257,7 @@
     canvas.height = Math.round(cssH * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     W = cssW; H = cssH;
+    rebuildCanyonCache();
   }
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", () => setTimeout(resize, 80));
@@ -264,7 +306,6 @@
     return c;
   }
 
-  const assets = { ready: false };
   function loadImg(src) {
     return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
   }
@@ -289,15 +330,16 @@
     assets.pestMosquito = keyNearBlack(pestMo);
     assets.pestWasp = keyNearBlack(pestWasp);
     assets.ready = true;
+    rebuildCanyonCache();
     if (bootEl) bootEl.remove();
   }).catch(() => { if (bootEl) bootEl.textContent = "art missing"; });
 
   const parts = [];
-  const PARTS_MAX = 48;
+  const PARTS_MAX = 16;
   function burst(x, y, n, opt) {
     opt = opt || {};
     if (parts.length >= PARTS_MAX) return;
-    n = Math.min(n, 8, PARTS_MAX - parts.length);
+    n = Math.min(n, 4, PARTS_MAX - parts.length);
     if (n <= 0) return;
     for (let i = 0; i < n; i++) {
       const ang = opt.ang != null ? opt.ang + rand(-0.4, 0.4) : rand(0, TAU);
@@ -361,7 +403,7 @@
       const a = clamp(f.life / f.max, 0, 1);
       ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = hsl(f.hue, 80, 72);
       ctx.font = `600 ${f.size}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.textAlign = "center"; ctx.shadowColor = hsl(f.hue, 90, 50, 0.6); ctx.shadowBlur = 12;
+      ctx.textAlign = "center";
       ctx.fillText(f.text, f.x, f.y); ctx.restore();
     }
   }
@@ -371,7 +413,11 @@
   let roostView = "hub", trophyFilter = "all", cardId = null, landT = 0, roostT = 0;
   const hits = [];
   const DIFF = () => DIFFS[save.difficulty] || DIFFS.keep;
-  function isRidge() { return save.view === "ridge"; }
+  let runView = "path";
+  function isRidge() {
+    if (state === STATE.FLY || state === STATE.LAND) return runView === "ridge";
+    return save.view === "ridge";
+  }
 
   const run = {
     t: 0, dur: 54, nectar: 0, combo: 0, comboT: 0, bestCombo: 0, kindledT: 0,
@@ -381,7 +427,8 @@
   const keeper = { x: 0.5, y: 0.76, bank: 0, vis: 0, roll: 0, pulseT: 99, pulseCd: 0, facing: 1, bob: 0, glow: 1, stagger: 0, vy: 0, grounded: true, coyote: 0 };
   const ents = [];
   const pulseRings = [];
-  const speedLines = [];
+  let liveCount = 0;
+  const ENT_CAP = 12;
   let spawnAcc = 0, pestAcc = 0, pickAcc = 0, worldZ = 0;
   let comboPop = 0, lastCatchName = "", lastCatchT = 0;
   let teachTap = true, teachHold = true;
@@ -397,7 +444,7 @@
     const k = keeperPx();
     const bobY = Math.sin(keeper.bob) * 2.2;
     const arm = Math.sin(keeper.bob + 0.45) * 5 * (keeper.stagger > 0 ? 0.3 : 1);
-    return { x: k.x + keeper.facing * 28, y: k.y - 48 + bobY + arm * 0.4 };
+    return { x: k.x + keeper.facing * (28 + arm * 1.1), y: k.y - 48 + bobY + arm * 0.55 };
   }
   function xToBank(px) {
     if (isRidge()) return clamp((px - W * 0.22) / (W * 0.12), -1, 1);
@@ -427,7 +474,7 @@
     run.bestCombo = 0; run.kindledT = 0; run.catches = 0;
     run.wickMax = d.wick; run.wick = d.wick; run.invuln = 1.6; run.crashed = false;
     run.shake = 0; run.hitFlash = 0; run.magnetT = 0; run.aegisT = 0; run.veilT = 0; run.bitten = false;
-    ents.length = 0; pulseRings.length = 0; speedLines.length = 0;
+    ents.length = 0; pulseRings.length = 0; liveCount = 0;
     keeper.bank = 0; keeper.vis = 0; keeper.roll = 0; keeper.facing = 1;
     keeper.pulseT = 99; keeper.pulseCd = 0; keeper.glow = 1; keeper.bob = 0; keeper.stagger = 0;
     keeper.vy = 0; keeper.grounded = true; keeper.coyote = 0;
@@ -448,20 +495,31 @@
     }
   }
 
-  function liveEnts() {
+  function liveEnts() { return liveCount; }
+  function killEnt(e) {
+    if (!e || !e.alive) return;
+    e.alive = false;
+    liveCount = Math.max(0, liveCount - 1);
+  }
+  function isPestEnt(e) {
+    return !!(e && (e.kind === "pest" || (e.def && e.def.threat)));
+  }
+  function livePests() {
     let n = 0;
-    for (let i = 0; i < ents.length; i++) if (ents[i].alive) n++;
+    for (let i = 0; i < ents.length; i++) if (ents[i].alive && isPestEnt(ents[i])) n++;
     return n;
   }
 
   function spawnSpec(def, x, y, delay) {
-    if (liveEnts() >= 18) return null;
+    const pest = def.kind === "pest" || def.threat;
+    if (liveCount >= ENT_CAP) return null;
+    if (pest && livePests() >= PEST_LIVE_CAP) return null;
     const e = {
       def, id: def.id, kind: def.kind, x, y,
       vx: rand(-18, 18), vy: scrollSpeed() * (0.55 + (def.speedMul || 0.4)) * rand(0.85, 1.12),
-      age: -(delay || 0), life: def.window + DIFF().win, phase: rand(0, TAU),
+      age: -(delay || 0), life: pest ? 1e9 : def.window + DIFF().win, phase: rand(0, TAU),
       magnet: false, magSp: 0, alive: true, hopT: 0, dodgeT: 0,
-      gap: 0, gapW: 0, side: x < W * 0.5 ? -1 : 1, burned: false
+      gap: 0, gapW: 0, side: x < W * 0.5 ? -1 : 1, burned: false, stunT: 0, fled: false
     };
     if (isRidge()) {
       e.vx = -scrollSpeed() * (0.5 + (def.speedMul || 0.4)) * rand(0.9, 1.15);
@@ -479,6 +537,7 @@
       if (def.kind === "cliff") { e.x = e.side < 0 ? W * 0.1 : W * 0.9; e.vy = scrollSpeed() * 0.22; }
     }
     ents.push(e);
+    liveCount++;
     return e;
   }
 
@@ -506,26 +565,77 @@
   function doJump() {
     if (!isRidge() || state !== STATE.FLY) return;
     if (!(keeper.grounded || keeper.coyote > 0)) return;
-    keeper.vy = -1.4 * H;
+    keeper.vy = -1.5 * H;
     keeper.grounded = false;
     keeper.coyote = 0;
     keeper.pulseT = 0;
     if (equipped("step")) run.invuln = Math.max(run.invuln, 0.4 + (save.chips.step || 0) * 0.04);
     if (equipped("veil")) run.veilT = Math.max(run.veilT, 1.6 + (save.chips.veil || 0) * 0.12);
     SFX.jump(); vibe(10);
-    const kp = keeperPx();
-    burst(kp.x, kp.y + 8, 6, { hue: 38, speed: 70, life: 0.28, size: 1.6, ember: true });
+  }
+
+  function neutralizePest(e, label) {
+    if (!e || !e.alive) return;
+    killEnt(e);
+    if (e.def) logDex(e.def.id);
+    run.nectar += 1;
+    floatText(e.x, e.y - 10, label || "+1", { hue: 12, size: 12, life: 0.55 });
+  }
+
+  function breakOffWasp(e, lp) {
+    e.fled = true;
+    e.stunT = 1.45;
+    e.dodgeT = 0.75;
+    e.vx = (e.x < lp.x ? -1 : 1) * 360;
+    floatText(e.x, e.y - 10, "breaks off", { hue: 32, size: 12, life: 0.55 });
+  }
+  function engagePests(lp, R, kp) {
+    for (const e of ents) {
+      if (!e.alive || e.age < 0 || e.pickup || !e.def) continue;
+      if (e.def.id === "fen-mosquito") {
+        const dist = Math.hypot(e.x - lp.x, e.y - lp.y);
+        if (dist < R * 0.5) neutralizePest(e, "smoke");
+        else if (dist < R) {
+          e.vx += (e.x - lp.x) * 8;
+          e.vy = (e.vy || 0) * 0.25 - 90;
+        }
+      } else if (e.def.id === "paper-nest-wasp") {
+        const dist = Math.hypot(e.x - lp.x, e.y - lp.y);
+        if (dist >= R * 0.9) continue;
+        const overlap = Math.hypot(e.x - kp.x, e.y - kp.y) < 28;
+        if (overlap && !e.fled) { hitKeeper(e, "sting"); continue; }
+        if (e.fled && !overlap) neutralizePest(e, "smoke");
+        else breakOffWasp(e, lp);
+      } else if (e.def.id === "gate-orb-weaver") {
+        const dist = Math.hypot(e.x - lp.x, e.y - lp.y);
+        if (Math.abs(e.y - lp.y) < 30 || dist < R) burnThread(e);
+      }
+    }
+  }
+
+  function doSnap() {
+    if (state !== STATE.FLY) return;
+    if (keeper.pulseCd > 0) return;
+    keeper.pulseCd = pulseCdMax();
+    keeper.pulseT = 0;
+    keeper.glow = 1.9;
+    const lp = lanternPx(), R = pulseRadiusPx(), kp = keeperPx();
+    pulseRings.push({ x: lp.x, y: lp.y, r: 8, max: R * 1.12, life: 0.34, a: 1 });
+    SFX.pulse(); vibe(14);
+    if (equipped("step")) run.invuln = Math.max(run.invuln, 0.55 + (save.chips.step || 0) * 0.04);
+    if (equipped("veil")) run.veilT = Math.max(run.veilT, 1.6 + (save.chips.veil || 0) * 0.12);
+    engagePests(lp, R, kp);
   }
 
   function doPulse() {
-    if (isRidge()) { doJump(); return; }
+    if (isRidge()) { doSnap(); return; }
     if (keeper.pulseCd > 0) return;
     keeper.pulseCd = pulseCdMax();
     keeper.pulseT = 0; keeper.glow = 1.9;
-    const lp = lanternPx(), R = pulseRadiusPx();
+    const lp = lanternPx(), R = pulseRadiusPx(), kp = keeperPx();
     pulseRings.push({ x: lp.x, y: lp.y, r: 8, max: R * 1.12, life: 0.34, a: 1 });
     SFX.pulse(); vibe(14);
-    burst(lp.x, lp.y, 8, { hue: 38, speed: 150, life: 0.36, size: 2.2, streak: true, ember: true });
+    burst(lp.x, lp.y, 4, { hue: 38, speed: 150, life: 0.36, size: 2.2, streak: true, ember: true });
     if (equipped("step")) run.invuln = Math.max(run.invuln, 0.55 + (save.chips.step || 0) * 0.04);
     if (equipped("veil")) run.veilT = Math.max(run.veilT, 1.6 + (save.chips.veil || 0) * 0.12);
     for (const e of ents) {
@@ -534,31 +644,25 @@
       if (e.kind === "aerial" || e.kind === "cliff") {
         if (dist < R * (e.def.mag || 1) + e.def.r) { e.magnet = true; e.magSp = 230 + (R - dist) * 2; }
       } else if (e.kind === "ground") {
-        const kp = keeperPx();
         if (Math.abs(e.x - kp.x) < 50 && Math.abs(e.y - kp.y) < 54) catchEnt(e);
         else if (dist < R * 0.72) { e.magnet = true; e.magSp = 180; }
-      } else if (e.def.id === "fen-mosquito") {
-        if (dist < R * 0.7) { e.vx += (e.x - lp.x) * 6; e.vy *= 0.35; e.y -= 16; }
-      } else if (e.def.id === "paper-nest-wasp") {
-        if (dist < R * 1.05) { e.dodgeT = 0.35; e.vx = (e.x < lp.x ? -1 : 1) * 280; }
-      } else if (e.def.id === "gate-orb-weaver") {
-        if (Math.abs(e.y - lp.y) < 30 || dist < R) burnThread(e);
       }
     }
+    engagePests(lp, R, kp);
   }
 
   function burnThread(e) {
     if (!e.alive) return;
-    e.alive = false; e.burned = true;
+    killEnt(e); e.burned = true;
     logDex(e.def.id);
-    burst(e.x, e.y, 8, { hue: 38, speed: 110, life: 0.4, size: 2, streak: true, ember: true });
+    burst(e.x, e.y, 4, { hue: 38, speed: 110, life: 0.4, size: 2, streak: true, ember: true });
     floatText(e.gap || e.x, e.y - 8, "strand burns", { hue: 38, size: 12, life: 0.6 });
     run.nectar += 3;
   }
 
   function catchEnt(e) {
     if (!e.alive) return;
-    e.alive = false;
+    killEnt(e);
     const fading = e.age > e.life;
     const lp = lanternPx();
     run.combo = (run.comboT > 0 && run.combo > 0) ? run.combo + 1 : 1;
@@ -576,7 +680,7 @@
     SFX.catch();
     if (run.combo >= 2) SFX.combo();
     vibe(run.combo >= 5 ? [6, 20, 10] : 10);
-    burst(e.x, e.y, 8, { hue: e.def.hue, speed: 160, life: 0.45, size: 2.5, streak: true, ember: true });
+    burst(e.x, e.y, 4, { hue: e.def.hue, speed: 160, life: 0.45, size: 2.5, streak: true, ember: true });
     floatText(lp.x + rand(-16, 16), lp.y - 40, `+${n}`, { hue: e.def.hue, size: 14 + Math.min(8, run.combo) });
   }
 
@@ -587,7 +691,7 @@
 
   function hitKeeper(e, label) {
     if (run.invuln > 0 || run.aegisT > 0 || run.veilT > 0) return;
-    if (e) e.alive = false;
+    killEnt(e);
     run.wick = Math.max(0, run.wick - 1);
     run.invuln = 1.35; run.shake = 1; run.hitFlash = 1;
     if (label === "bite") run.bitten = true;
@@ -595,14 +699,14 @@
     SFX.hit(); vibe([18, 30, 40]);
     const kp = keeperPx();
     keeper.stagger = 0.2;
-    burst(kp.x, kp.y, 8, { hue: 8, speed: 150, life: 0.45, size: 2.4, sat: 40 });
+    burst(kp.x, kp.y, 4, { hue: 8, speed: 150, life: 0.45, size: 2.4, sat: 40 });
     floatText(kp.x, kp.y - 36, label || "wick", { hue: 12, size: 14, life: 0.7 });
     if (e && e.def && e.def.threat) logDex(e.def.id);
     if (run.wick <= 0) { run.crashed = true; beginLand(); }
   }
 
   function grabPickup(e) {
-    e.alive = false;
+    killEnt(e);
     SFX.pickup(); vibe(10);
     const kp = keeperPx();
     if (e.pid === "wick") {
@@ -615,11 +719,11 @@
       run.aegisT = 5;
       floatText(kp.x, kp.y - 40, "aegis 5s", { hue: 210, size: 14 });
     }
-    burst(e.x, e.y, 8, { hue: e.pid === "wick" ? 110 : e.pid === "magnet" ? 200 : 0, speed: 90, life: 0.4, size: 2.2, ember: true });
+    burst(e.x, e.y, 4, { hue: e.pid === "wick" ? 110 : e.pid === "magnet" ? 200 : 0, speed: 90, life: 0.4, size: 2.2, ember: true });
   }
 
   function spawnPickup() {
-    if (liveEnts() >= 18) return;
+    if (liveCount >= ENT_CAP) return;
     const kinds = ["wick", "magnet", "aegis"];
     const pid = kinds[(Math.random() * 3) | 0];
     if (isRidge()) {
@@ -627,6 +731,7 @@
     } else {
       ents.push({ pickup: true, pid, x: W * 0.5 + rand(-W * 0.3, W * 0.3), y: -20, vy: scrollSpeed() * 0.7, alive: true, age: 0, kind: "pickup", phase: 0 });
     }
+    liveCount++;
   }
 
   const input = { pointers: new Map(), keys: Object.create(null) };
@@ -652,9 +757,9 @@
       const move = Math.hypot(loc.x - p.startX, loc.y - p.startY);
       p.maxMove = Math.max(p.maxMove, move);
       if (Math.abs(loc.x - p.startX) > MOVE_PX || move > MOVE_PX * 1.25) p.dragging = true;
-      if (state === STATE.FLY && isRidge() && !p.didJump && (p.startY - loc.y) > 32) {
-        p.didJump = true;
-        doJump();
+      if (state === STATE.FLY && isRidge()) {
+        if (!p.didJump && (p.startY - loc.y) > 32) { p.didJump = true; doJump(); }
+        else if (!p.didSnap && (loc.y - p.startY) > 28) { p.didSnap = true; doSnap(); }
       }
     }
   }
@@ -666,7 +771,7 @@
     input.pointers.delete(e.pointerId);
     if (state === STATE.FLY) {
       if (isRidge()) {
-        if (wasTap && !(p && p.didJump)) doJump();
+        if (wasTap && !(p && p.didJump) && !(p && p.didSnap) && keeper.grounded) doSnap();
       } else if (wasTap) doPulse();
     }
     if (state === STATE.LAND && landT > 0.7) openRoost(true);
@@ -682,7 +787,7 @@
 
   window.addEventListener("keydown", (e) => {
     SFX.resume(); input.keys[e.code] = true;
-    if (state === STATE.ROOST && roostView === "hub") {
+    if ((state === STATE.ROOST && roostView === "hub") || state === STATE.TITLE) {
       if (e.code === "KeyP" || e.code === "Digit1") {
         e.preventDefault();
         save.view = "path"; persist(); SFX.ui();
@@ -697,11 +802,15 @@
       else if (state === STATE.FLY && !e.repeat) {
         if (isRidge()) doJump();
         else doPulse();
-      } else if (state === STATE.ROOST && roostView === "hub") startFlight();
+      } else if (state === STATE.ROOST && roostView === "hub" && !e.repeat) startFlight();
     }
     if ((e.code === "ArrowUp" || e.code === "KeyW") && state === STATE.FLY && isRidge() && !e.repeat) {
       e.preventDefault();
       doJump();
+    }
+    if ((e.code === "KeyF" || e.code === "ArrowDown" || e.code === "KeyS") && state === STATE.FLY && isRidge() && !e.repeat) {
+      e.preventDefault();
+      doSnap();
     }
     if (e.code === "Enter" && state === STATE.ROOST && roostView === "hub") startFlight();
     if (e.code === "Escape" && state === STATE.ROOST) { roostView = "hub"; cardId = null; }
@@ -736,6 +845,7 @@
     state = STATE.ROOST; roostView = "hub"; roostT = fromLand ? 0 : 0.35; cardId = null;
   }
   function startFlight() {
+    runView = save.view === "ridge" ? "ridge" : "path";
     state = STATE.FLY; resetRun(); SFX.resume(); SFX.ui();
   }
   function beginLand() {
@@ -784,7 +894,7 @@
     keeper.bob += dt * 12;
     keeper.glow = 1.1 + Math.sin(titleT * 2.1) * 0.12;
     const lp = lanternPx();
-    if (Math.random() < dt * 1.4) burst(lp.x, lp.y, 1, { hue: 38, speed: 16, life: 1.2, size: 1.6, g: -30, drag: 0.98, ember: true });
+    if (Math.random() < dt * 0.4) burst(lp.x, lp.y, 1, { hue: 38, speed: 16, life: 1.2, size: 1.6, g: -30, drag: 0.98, ember: true });
   }
 
   function updateRidgeEnt(e, dt, kp, lp) {
@@ -794,7 +904,7 @@
       e.x += (e.vx || -sc * 0.7) * dt;
       e.y += Math.sin(e.phase) * 10 * dt;
       if (Math.hypot(e.x - kp.x, e.y - kp.y) < 42) grabPickup(e);
-      if (e.x < -60 || e.x > W + 80 || e.y < -40 || e.y > H + 40) e.alive = false;
+      if (e.x < -60 || e.x > W + 80 || e.y < -40 || e.y > H + 40) killEnt(e);
       return;
     }
     if (e.age < 0) return;
@@ -808,7 +918,7 @@
         const inGap = Math.abs(cy - e.gap) < (e.gapW || 100) * 0.5;
         if (!inGap) hitKeeper(e, "web");
       }
-      if (e.x < -60 || e.x > W + 80) e.alive = false;
+      if (e.x < -60 || e.x > W + 80) killEnt(e);
       return;
     }
     if (e.magnet || (run.magnetT > 0 && e.kind !== "pest")) {
@@ -829,15 +939,16 @@
       if (e.def.hop) e.y -= Math.abs(Math.sin(e.hopT * 6)) * 36 * dt;
     } else if (e.def.id === "fen-mosquito" || e.def.id === "paper-nest-wasp") {
       e.y += Math.sin(e.phase * 2.4) * 22 * dt;
+      if (e.stunT > 0) e.stunT -= dt;
       if (e.dodgeT > 0) { e.dodgeT -= dt; e.x += e.vx * dt; }
     }
     if (e.kind !== "pest") {
       if (Math.hypot(e.x - lp.x, e.y - lp.y) < catchR + (e.def.r || 12)) catchEnt(e);
       else if (e.kind === "ground" && Math.abs(e.x - kp.x) < 36 && Math.abs(e.y - kp.y) < 32) catchEnt(e);
     } else if (Math.hypot(e.x - kp.x, e.y - (kp.y - 28)) < 26) {
-      hitKeeper(e, e.def.id === "fen-mosquito" ? "bite" : "sting");
+      if (!(e.stunT > 0 && e.def.id === "paper-nest-wasp")) hitKeeper(e, e.def.id === "fen-mosquito" ? "bite" : "sting");
     }
-    if (e.x < -60 || e.x > W + 80 || e.y < -40 || e.y > H + 40) e.alive = false;
+    if (e.x < -60 || e.x > W + 80 || e.y < -40 || e.y > H + 40) killEnt(e);
   }
 
   function updateFly(dt) {
@@ -852,7 +963,7 @@
     steering(dt);
     if (isRidge()) {
       keeper.facing = 1;
-      keeper.vy += 4.6 * H * dt;
+      keeper.vy += 6.2 * H * dt;
       keeper.y += keeper.vy * dt / H;
       const floor = 0.82;
       if (keeper.y >= floor) {
@@ -873,37 +984,35 @@
     lastCatchT = Math.max(0, lastCatchT - dt);
 
     const kp = keeperPx(), lp = lanternPx();
-    if (Math.random() < dt * 2) burst(kp.x + rand(-8, 8), kp.y + 18, 1, { hue: 32, speed: 10, life: 0.5, size: 1.4, g: 30, drag: 0.95, ember: true });
+    if (Math.random() < dt * 0.4) burst(kp.x + rand(-8, 8), kp.y + 18, 1, { hue: 32, speed: 10, life: 0.5, size: 1.4, g: 30, drag: 0.95, ember: true });
 
     const heat = clamp(run.t / run.dur, 0, 1);
     spawnAcc += dt;
     const interval = Math.max(0.55, lerp(0.68, 0.55, heat));
-    const aerials = SPEC.filter((s) => s.kind === "aerial");
-    const grounds = SPEC.filter((s) => s.kind === "ground" || s.kind === "cliff");
-    const pests = SPEC.filter((s) => s.kind === "pest");
     while (spawnAcc >= interval) {
       spawnAcc -= interval;
-      if (liveEnts() >= 18) { spawnAcc = 0; break; }
+      if (liveCount >= ENT_CAP) { spawnAcc = 0; break; }
       if (isRidge()) {
-        if (Math.random() < 0.6) spawnWeighted(aerials, W + 28, rand(H * 0.32, H * 0.58));
-        else spawnWeighted(grounds, W + 28, H * 0.82 - 6);
+        if (Math.random() < 0.6) spawnWeighted(AERIALS, W + 28, rand(H * 0.32, H * 0.58));
+        else spawnWeighted(GROUNDS, W + 28, H * 0.82 - 6);
       } else {
         const x = W * 0.5 + rand(-W * 0.32, W * 0.32);
-        if (Math.random() < 0.6) spawnWeighted(aerials, x, rand(-40, H * 0.06));
-        else spawnWeighted(grounds, x, -30);
+        if (Math.random() < 0.6) spawnWeighted(AERIALS, x, rand(-40, H * 0.06));
+        else spawnWeighted(GROUNDS, x, -30);
       }
     }
     if (run.t > 10) {
       pestAcc += dt;
-      const pInt = Math.max(1.4, lerp(2.2, 1.4, heat) / Math.max(0.35, DIFF().pest));
+      // Keep floor: never faster than 1.4s, even when Ember scales density.
+      const pInt = Math.max(PEST_INTERVAL_MIN, lerp(2.2, PEST_INTERVAL_MIN, heat) / Math.max(0.35, DIFF().pest));
       while (pestAcc >= pInt) {
         pestAcc -= pInt;
-        if (liveEnts() >= 18) { pestAcc = 0; break; }
+        if (liveCount >= ENT_CAP || livePests() >= PEST_LIVE_CAP) { pestAcc = 0; break; }
         if (isRidge()) {
           const high = Math.random() < 0.45;
-          spawnWeighted(pests, W + 32, high ? rand(H * 0.26, H * 0.40) : rand(H * 0.64, H * 0.76));
+          spawnWeighted(PESTS, W + 32, high ? rand(H * 0.26, H * 0.40) : rand(H * 0.64, H * 0.76));
         } else {
-          spawnWeighted(pests, W * 0.5 + rand(-W * 0.3, W * 0.3), -30);
+          spawnWeighted(PESTS, W * 0.5 + rand(-W * 0.3, W * 0.3), -30);
         }
       }
     }
@@ -918,7 +1027,7 @@
       if (e.pickup) {
         e.y += e.vy * dt; e.x += Math.sin(e.phase) * 12 * dt;
         if (Math.hypot(e.x - kp.x, e.y - kp.y) < 42) grabPickup(e);
-        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) killEnt(e);
         continue;
       }
       if (e.age < 0) continue;
@@ -927,7 +1036,7 @@
         const onLine = Math.abs(e.y - kp.y) < 16;
         const inGap = Math.abs(kp.x - e.gap) < e.gapW * 0.5;
         if (onLine && !inGap) hitKeeper(e, "web");
-        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) killEnt(e);
         continue;
       }
       if (e.magnet || (run.magnetT > 0 && (e.kind === "aerial" || e.kind === "cliff"))) {
@@ -943,7 +1052,7 @@
         e.x += wx * dt * 3;
         e.y += e.vy * dt * 0.55;
         if (e.kind === "cliff") e.x = lerp(e.x, e.side < 0 ? W * 0.11 : W * 0.89, 0.08);
-        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) killEnt(e);
       } else if (e.kind === "ground") {
         if (e.def.hop) {
           e.hopT += dt;
@@ -956,33 +1065,23 @@
         }
         const over = Math.abs(e.x - kp.x) < 38 && Math.abs(e.y - kp.y) < 36;
         if (over && (keeper.pulseT < 0.28 || Math.abs(e.x - kp.x) < 22)) catchEnt(e);
-        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) killEnt(e);
       } else if (e.def.id === "fen-mosquito") {
         e.vx += (kp.x - e.x) * 1.1 * dt;
         e.vx *= 0.96;
         e.x += e.vx * dt + Math.sin(e.phase * 3) * 22 * dt;
         e.y += Math.max(70, scrollSpeed() * 0.55) * dt;
         if (Math.hypot(e.x - kp.x, e.y - (kp.y - 24)) < 26) hitKeeper(e, "bite");
-        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) killEnt(e);
       } else if (e.def.id === "paper-nest-wasp") {
+        if (e.stunT > 0) e.stunT -= dt;
         if (e.dodgeT > 0) e.dodgeT -= dt;
         e.x += (e.vx + Math.sin(e.phase * 2) * 90) * dt;
         e.y += scrollSpeed() * 0.62 * dt;
         e.vx *= 0.9;
-        if (Math.hypot(e.x - kp.x, e.y - kp.y) < 28) hitKeeper(e, "sting");
-        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
+        if (e.stunT <= 0 && Math.hypot(e.x - kp.x, e.y - kp.y) < 28) hitKeeper(e, "sting");
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) killEnt(e);
       }
-    }
-
-    if (run.combo >= 8 && speedLines.length < 6 && Math.random() < dt * 12) {
-      if (isRidge()) speedLines.push({ x: rand(W * 0.3, W), y: rand(H * 0.15, H * 0.75), len: rand(16, 40), a: 0.3, v: 380, horiz: true });
-      else speedLines.push({ x: rand(0, W), y: rand(0, H * 0.6), len: rand(16, 40), a: 0.3, v: 380 });
-    }
-    for (let i = speedLines.length - 1; i >= 0; i--) {
-      const sl = speedLines[i];
-      if (sl.horiz) sl.x -= sl.v * dt; else sl.y += sl.v * dt;
-      sl.a -= dt * 0.8;
-      if (sl.a <= 0 || sl.y > H || sl.x < -40) speedLines.splice(i, 1);
     }
     if (run.t >= run.dur && !run.crashed) beginLand();
   }
@@ -1000,26 +1099,24 @@
     roostT += dt; worldZ += dt * 1.4;
     keeper.vis = Math.sin(roostT * 0.5) * 0.08;
     keeper.glow = 1.15 + Math.sin(roostT * 2) * 0.1;
-    if (Math.random() < dt * 1.6) burst(W * 0.5 + rand(-30, 30), H * 0.38, 1, { hue: 38, speed: 12, life: 1.3, size: 1.6, g: -18, drag: 0.98, ember: true });
+    if (Math.random() < dt * 0.4) burst(W * 0.5 + rand(-30, 30), H * 0.38, 1, { hue: 38, speed: 12, life: 1.3, size: 1.6, g: -18, drag: 0.98, ember: true });
   }
 
   function drawCanyon() {
-    const img = assets.canyon;
-    if (img) {
-      const scale = Math.max(W / img.width, H / img.height) * 1.12;
-      const dw = img.width * scale, dh = img.height * scale;
+    const cv = canyonCache.cv;
+    if (cv) {
+      const dw = canyonCache.dw, dh = canyonCache.dh;
       if (isRidge() && (state === STATE.FLY || state === STATE.LAND)) {
         const extraX = Math.max(1, dw - W);
-        const pan = (worldZ * 10) % extraX;
+        const sx = (worldZ * 10) % extraX;
         const extraY = Math.max(0, dh - H);
-        const oy = extraY > 0 ? -extraY * 0.45 : (H - dh) / 2;
-        ctx.drawImage(img, -pan, oy, dw, dh);
-        if (dw - pan < W + 2) ctx.drawImage(img, -pan + extraX, oy, dw, dh);
+        const sy = extraY > 0 ? extraY * 0.45 : 0;
+        ctx.drawImage(cv, sx, sy, Math.min(W, dw - sx), Math.min(H, dh - sy), 0, 0, W, H);
       } else {
-        const ox = (W - dw) / 2;
         const extra = Math.max(0, dh - H);
-        const oy = extra > 0 ? -((worldZ * 8) % extra) : (H - dh) / 2;
-        ctx.drawImage(img, ox, oy, dw, dh);
+        const sy = extra > 0 ? ((worldZ * 8) % extra) : 0;
+        const sx = dw > W ? (dw - W) * 0.5 : 0;
+        ctx.drawImage(cv, sx, sy, Math.min(W, dw), Math.min(H, dh), 0, 0, W, H);
       }
     } else {
       ctx.fillStyle = "#0a0816";
@@ -1089,11 +1186,8 @@
       ctx.globalAlpha = 1;
     }
     if (tiny && look.flash && Math.sin(e.phase * 6) >= 0) {
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
       ctx.fillStyle = look.flash;
       ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, TAU); ctx.fill();
-      ctx.restore();
     }
     ctx.fillStyle = look.body;
     ctx.beginPath();
@@ -1215,19 +1309,7 @@
   function drawPestPip(yOff) {
     const y = yOff == null ? -22 : yOff;
     ctx.fillStyle = "#e03a32";
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(-4.6, y - 8);
-    ctx.lineTo(4.6, y - 8);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  function drawNectarPip(r) {
-    ctx.fillStyle = "rgba(255,232,170,0.9)";
-    ctx.beginPath();
-    ctx.arc(r * 0.95, -r * 0.85, 2.05, 0, TAU);
-    ctx.fill();
+    ctx.fillRect(-1.5, y - 3, 3, 3);
   }
 
   function drawSpecimen(def, phase) {
@@ -1266,7 +1348,7 @@
         ctx.save();
         ctx.translate(e.x, e.gap - e.gapW * 0.5);
         drawPestVector(e);
-        if (e.x >= 0 && e.x <= W) drawPestPip(-16);
+        if (e.x >= 0 && e.x <= W && e.y >= 0 && e.y <= H) drawPestPip(-16);
         ctx.restore();
       } else if (isRidge() && e.webMode === "low") {
         const half = (e.webLen || 34);
@@ -1274,7 +1356,7 @@
         ctx.save();
         ctx.translate(e.x + half * 0.7, e.y);
         drawPestVector(e);
-        if (e.x >= 0 && e.x <= W) drawPestPip(-16);
+        if (e.x >= 0 && e.x <= W && e.y >= 0 && e.y <= H) drawPestPip(-16);
         ctx.restore();
       } else {
         ctx.beginPath(); ctx.moveTo(0, e.y); ctx.lineTo(e.gap - e.gapW * 0.5, e.y); ctx.stroke();
@@ -1292,18 +1374,11 @@
     ctx.save(); ctx.translate(e.x, e.y); ctx.globalAlpha = clamp(fade, 0, 1);
     const pest = e.kind === "pest" || (e.def && e.def.threat);
     if (!pest) {
-      const blinkOff = e.def.blink && Math.sin(e.phase * 6) < 0;
-      if (e.def.blink) {
-        if (!blinkOff) {
-          ctx.save();
-          ctx.globalCompositeOperation = "lighter";
-          ctx.fillStyle = "rgba(160,255,120,0.4)";
-          ctx.beginPath(); ctx.arc(0, 0, e.def.r * 2.2, 0, TAU); ctx.fill();
-          ctx.restore();
-        }
-      } else {
-        ctx.fillStyle = "rgba(255,214,130,0.32)";
-        ctx.beginPath(); ctx.arc(0, 0, e.def.r * 2.35, 0, TAU); ctx.fill();
+      ctx.fillStyle = "rgba(255,186,90,0.28)";
+      ctx.beginPath(); ctx.arc(0, 0, e.def.r * 2.55, 0, TAU); ctx.fill();
+      if (e.def.blink && Math.sin(e.phase * 6) >= 0) {
+        ctx.fillStyle = "rgba(160,255,120,0.45)";
+        ctx.beginPath(); ctx.arc(0, 0, e.def.r * 1.35, 0, TAU); ctx.fill();
       }
     }
     if (e.def.sheet === "moths") drawMoth(e);
@@ -1313,8 +1388,7 @@
       ctx.fillStyle = hsl(e.def.hue, 80, 60, 0.85);
       ctx.beginPath(); ctx.ellipse(0, 0, e.def.r * 1.3, e.def.r * 0.7, Math.sin(e.phase) * 0.3, 0, TAU); ctx.fill();
     }
-    if (!pest) drawNectarPip(e.def.r || 12);
-    else if (e.x >= 0 && e.x <= W && e.y >= 0 && e.y <= H) drawPestPip(e.def.id === "fen-mosquito" ? -26 : -20);
+    if (pest && e.y >= 0 && e.y <= H && (((time * 30) | 0) % 2 === 0)) drawPestPip(e.def.id === "fen-mosquito" ? -26 : -20);
     ctx.restore();
   }
 
@@ -1340,18 +1414,20 @@
     const coat = -swing * 10 * amp;
     const headBob = air ? 0 : -Math.abs(swing) * 2.4;
     const arm = Math.sin(keeper.bob + 0.45) * 9 * (air ? 0.35 : amp);
-    const lx = air ? -3 : -5 + swing * 18 * amp;
-    const rx = air ? 5 : 5 - swing * 18 * amp;
-    const fy = air ? 5 : 10;
-    const ky = air ? -7 : -8 + Math.abs(swing) * 3;
-    const lkx = air ? -4 : -5 + swing * 7 * amp;
-    const rkx = air ? 4 : 5 - swing * 7 * amp;
+    const lx = air ? -3 : -6 + swing * 26 * amp;
+    const rx = air ? 6 : 6 - swing * 26 * amp;
+    const fy = air ? 5 : 10 + Math.abs(swing) * 1.5;
+    const ky = air ? -7 : -9 + Math.abs(swing) * 4;
+    const lkx = air ? -4 : -5 + swing * 10 * amp;
+    const rkx = air ? 4 : 5 - swing * 10 * amp;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#1c1a16";
     ctx.lineWidth = 5.5;
-    ctx.beginPath(); ctx.moveTo(-5, -22); ctx.lineTo(lkx, ky); ctx.lineTo(lx, fy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(5, -22); ctx.lineTo(rkx, ky); ctx.lineTo(rx, fy); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-5, -22); ctx.lineTo(lkx, ky); ctx.lineTo(lx, fy);
+    ctx.moveTo(5, -22); ctx.lineTo(rkx, ky); ctx.lineTo(rx, fy);
+    ctx.stroke();
     ctx.fillStyle = "#14120e";
     ctx.beginPath(); ctx.ellipse(lx + 3, fy + 2, 7, 3, 0, 0, TAU); ctx.fill();
     ctx.beginPath(); ctx.ellipse(rx + 3, fy + 2, 7, 3, 0, 0, TAU); ctx.fill();
@@ -1366,7 +1442,7 @@
     ctx.moveTo(-15, -60 + headBob * 0.2);
     ctx.lineTo(14, -60 + headBob * 0.2);
     ctx.lineTo(17 + coat * 0.25, -18);
-    ctx.quadraticCurveTo(coat * 0.5, -8, -17 + coat, -18);
+    ctx.lineTo(-17 + coat, -18);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = "#1e261c";
@@ -1374,7 +1450,7 @@
     ctx.moveTo(-16 + coat * 0.4, -24);
     ctx.lineTo(16 + coat * 0.2, -24);
     ctx.lineTo(18 + coat * 0.3, -12);
-    ctx.quadraticCurveTo(coat, -6, -18 + coat, -12);
+    ctx.lineTo(-18 + coat, -12);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = "#3a4434";
@@ -1395,7 +1471,7 @@
     ctx.lineWidth = 4.2;
     ctx.beginPath();
     ctx.moveTo(10, -52);
-    ctx.lineTo(24 + arm * 0.25, -48 + arm * 0.55);
+    ctx.lineTo(26 + arm * 0.55, -50 + arm * 0.85);
     ctx.stroke();
   }
   function drawKeeper() {
@@ -1411,8 +1487,7 @@
         keeper._landT = time;
       }
       if (keeper._landT != null) {
-        const land = Math.max(0, 1 - (time - keeper._landT) / 0.12);
-        squash = land * land;
+        squash = Math.max(0, 1 - (time - keeper._landT) / 0.2);
         if (squash <= 0) keeper._landT = null;
       }
     }
@@ -1421,22 +1496,17 @@
     ctx.save();
     ctx.translate(kp.x, kp.y);
     ctx.rotate(keeper.roll);
-    ctx.scale(sx, sy);
+    ctx.scale(sx * keeper.facing, sy);
     if (run.invuln > 0 && ((time * 18) | 0) % 2 === 0) ctx.globalAlpha = 0.5;
     if (run.aegisT > 0) {
-      ctx.save(); ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = `rgba(200,220,255,${0.45 + 0.2 * Math.sin(time * 8)})`; ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(200,220,255,0.5)"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(0, -28, 48, 0, TAU); ctx.stroke();
-      ctx.restore();
     }
     if (run.veilT > 0) {
       ctx.fillStyle = "rgba(40,36,48,0.28)";
       ctx.beginPath(); ctx.ellipse(0, -10, 40, 50, 0, 0, TAU); ctx.fill();
     }
-    ctx.save();
-    ctx.scale(keeper.facing, 1);
     drawRangerWalk();
-    ctx.restore();
     ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.beginPath(); ctx.ellipse(0, 16, 22 * (1 + squash * 0.35), 6, 0, 0, TAU); ctx.fill();
     ctx.restore();
@@ -1444,15 +1514,15 @@
     ctx.save();
     ctx.translate(lp.x, lp.y);
     const flick = 0.9 + 0.1 * Math.sin(time * 14);
-    ctx.save(); ctx.globalCompositeOperation = "lighter";
-    const gR = (isRidge() && state === STATE.FLY ? 44 : 54) * keeper.glow * flick;
-    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, gR);
-    g.addColorStop(0, `rgba(255,236,180,${0.55 * keeper.glow})`);
-    g.addColorStop(0.35, `rgba(255,180,80,${0.22 * keeper.glow})`);
-    g.addColorStop(1, "rgba(255,80,20,0)");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, gR, 0, TAU); ctx.fill();
-    ctx.restore();
-    ctx.rotate(Math.sin(keeper.bob + 0.45) * 0.12 * (keeper.stagger > 0 ? 0.3 : 1));
+    if (state === STATE.FLY) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const gR = (isRidge() ? 44 : 54) * keeper.glow * flick;
+      ctx.globalAlpha = Math.min(1, 0.85 * keeper.glow);
+      ctx.drawImage(lanternGlowSheet(), -gR, -gR, gR * 2, gR * 2);
+      ctx.restore();
+    }
+    ctx.rotate(Math.sin(keeper.bob + 0.45) * 0.28 * (keeper.stagger > 0 ? 0.3 : 1));
     ctx.fillStyle = "#3a2a18";
     ctx.fillRect(-5, -14, 10, 4);
     ctx.fillStyle = "#c4a060";
@@ -1486,7 +1556,7 @@
   function drawHUD() {
     if (state !== STATE.FLY && state !== STATE.LAND) return;
     const pad = Math.max(14, W * 0.04), top = Math.max(22, H * 0.038);
-    ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.75)"; ctx.shadowBlur = 10;
+    ctx.save();
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(232,234,237,0.5)";
     ctx.font = `600 ${Math.round(Math.max(11, W * 0.03))}px ui-sans-serif, system-ui, sans-serif`;
@@ -1536,12 +1606,18 @@
       ctx.fillStyle = "rgba(180,220,255,0.75)";
       ctx.fillText(buffs.join("  ·  "), W / 2, H - 22);
     }
+    if (showFps) {
+      ctx.textAlign = "left";
+      ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillStyle = "#8dff6a";
+      ctx.fillText(Math.round(lastFps) + " fps", pad, H - 22);
+    }
     ctx.restore();
     if (state === STATE.FLY && run.t < 6) {
       ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,230,190,0.85)";
       ctx.font = "600 13px ui-sans-serif, system-ui, sans-serif";
       ctx.globalAlpha = 0.55 + 0.2 * Math.sin(time * 4);
-      ctx.fillText(isRidge() ? "tap  jump     gold  catch     red  dodge" : "gold glow  catch     red  dodge", W / 2, H * 0.88);
+      ctx.fillText(isRidge() ? "jump  dodge     snap  down  engage" : "tap snap  pests     gold  catch", W / 2, H * 0.88);
       ctx.restore();
     } else if (state === STATE.FLY && (teachTap || teachHold) && !isRidge()) {
       ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,230,190,0.8)";
@@ -1668,13 +1744,13 @@
       ctx.fillText("chip " + (save.chips[a.id] || 0), ax + cw / 2, H * 0.652);
       addHit("ab:" + a.id, ax, H * 0.56, cw, H * 0.11);
     });
-    pill("play", W * 0.18, H * 0.695, W * 0.64, 44, "play  Night Canyon", true);
+    pill("play", W * 0.18, H * 0.695, W * 0.64, 44, isRidge() ? "play  RIDGE" : "play  PATH", true);
     pill("map", W * 0.08, H * 0.775, W * 0.4, 38, "campaign", false);
     pill("trophy", W * 0.52, H * 0.775, W * 0.4, 38, "trophy room", false);
     ctx.font = "11px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.55)";
     ctx.fillText("1 Path  ·  2 Ridge  ·  Space play", W / 2, H * 0.855);
     ctx.fillStyle = "rgba(232,234,237,0.35)";
-    ctx.fillText(isRidge() ? "TAP jump  ·  swipe up  ·  A/D  ·  Space" : "TAP pulse  ·  DRAG strafe  ·  A/D  ·  Space", W / 2, H * 0.885);
+    ctx.fillText(isRidge() ? "swipe up jump  ·  tap/down snap  ·  F  ·  Space" : "TAP pulse  ·  DRAG strafe  ·  A/D  ·  Space", W / 2, H * 0.885);
     ctx.fillText("Reed Marsh · Cliff Garden · Sky-Ruins locked", W / 2, H * 0.915);
     ctx.restore();
   }
@@ -1808,19 +1884,8 @@
   function frame() {
     applyCamera(() => {
       drawCanyon();
-      if (speedLines.length) {
-        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = "rgba(255,230,200,0.16)"; ctx.lineWidth = 1;
-        for (const s of speedLines) {
-          ctx.globalAlpha = s.a; ctx.beginPath();
-          if (s.horiz) { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.len, s.y); }
-          else { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x, s.y + s.len); }
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
       if (state === STATE.FLY || state === STATE.LAND || state === STATE.TITLE) {
-        const ordered = ents.slice().sort((a, b) => a.y - b.y);
-        for (const e of ordered) drawEnt(e);
+        for (const e of ents) drawEnt(e);
         drawPulseRings(); drawParts(); drawKeeper(); drawFloats();
       }
     });
@@ -1831,15 +1896,21 @@
     if (state === STATE.ROOST) { drawRoost(); drawParts(); drawFloats(); }
   }
 
+  const showFps = /(?:\?|&)fps=1(?:&|$)/.test(location.search);
+  let fpsFrames = 0, fpsAccum = 0, lastFps = 0;
   let last = performance.now();
   function tick(now) {
-    let dt = (now - last) / 1000; last = now; if (dt > 0.05) dt = 0.05; time += dt;
-    if (state === STATE.TITLE) updateTitle(dt);
-    else if (state === STATE.FLY) updateFly(dt);
-    else if (state === STATE.LAND) updateLand(dt);
-    else if (state === STATE.ROOST) updateRoost(dt);
-    updateParts(dt); updateFloats(dt); frame();
     requestAnimationFrame(tick);
+    try {
+      let dt = (now - last) / 1000; last = now; if (dt > 0.05) dt = 0.033; time += dt;
+      fpsFrames++; fpsAccum += dt;
+      if (fpsAccum >= 0.5) { lastFps = fpsFrames / fpsAccum; fpsFrames = 0; fpsAccum = 0; }
+      if (state === STATE.TITLE) updateTitle(dt);
+      else if (state === STATE.FLY) updateFly(dt);
+      else if (state === STATE.LAND) updateLand(dt);
+      else if (state === STATE.ROOST) updateRoost(dt);
+      updateParts(dt); updateFloats(dt); frame();
+    } catch (err) { console.error(err); }
   }
 
   if (!CanvasRenderingContext2D.prototype.roundRect) {
