@@ -5,36 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#05040c" />
-  <title>KINDLED</title>
+  <meta name="theme-color" content="#0b0c10" />
+  <title>KINDLED — Night Canyon</title>
   <style>
-    :root { --bg:#05040c; --ink:#f4ead8; }
+    :root { --bg:#0b0c10; --ink:#e8eaed; }
     * { box-sizing:border-box; margin:0; padding:0; }
     html, body {
       height:100%; width:100%; overflow:hidden; background:var(--bg); color:var(--ink);
-      font-family:"Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       touch-action:none; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent;
     }
     #wrap {
       width:100vw; height:100vh; height:100dvh;
       display:flex; align-items:center; justify-content:center;
-      background: radial-gradient(ellipse at 50% 28%, #1a1230 0%, #05040c 64%);
+      background:#0b0c10;
     }
     #game {
-      display:block; touch-action:none; background:#07060e;
-      box-shadow: 0 0 0 1px rgba(255,200,120,.08), 0 18px 80px rgba(0,0,0,.55);
+      display:block; touch-action:none; background:#0b0c10;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 12px 40px rgba(0,0,0,.45);
       max-width:100vw; max-height:100vh; max-height:100dvh;
     }
     #boot {
       position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-      color:#c9b896; letter-spacing:.35em; font-size:11px; text-transform:uppercase;
-      pointer-events:none; opacity:.45;
+      color:#9aa0a6; font-size:13px;
+      pointer-events:none;
     }
   </style>
 </head>
 <body>
   <div id="wrap"><canvas id="game" width="405" height="720"></canvas></div>
-  <div id="boot">kindling…</div>
+  <div id="boot">Loading</div>
   <script src="game.js"></script>
 </body>
 </html>

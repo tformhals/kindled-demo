@@ -7,7 +7,7 @@
   const bootEl = document.getElementById("boot");
 
   const TAU = Math.PI * 2;
-  const SAVE_KEY = "kindled-webhost-v2";
+  const SAVE_KEY = "kindled-webhost-v3";
   const FIB = [1, 2, 3, 5, 8, 12, 18, 24, 36];
   const TAP_MS = 180;
   const MOVE_PX = 12;
@@ -230,6 +230,7 @@
   function fibStep(c) { return c <= 0 ? 0 : FIB[Math.min(FIB.length - 1, c - 1)]; }
 
   function keyImage(img, thresh) {
+    if (!img) return null;
     const c = document.createElement("canvas");
     c.width = img.width; c.height = img.height;
     const x = c.getContext("2d");
@@ -245,22 +246,45 @@
     x.putImageData(id, 0, 0);
     return c;
   }
+  function keyNearBlack(img) {
+    if (!img) return null;
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext("2d");
+    x.drawImage(img, 0, 0);
+    const id = x.getImageData(0, 0, c.width, c.height);
+    const d = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] + d[i + 1] + d[i + 2] < 30) d[i + 3] = 0;
+    }
+    x.putImageData(id, 0, 0);
+    return c;
+  }
 
   const assets = { ready: false };
   function loadImg(src) {
     return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
   }
+  function loadImgOpt(src) {
+    return new Promise((res) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => res(null);
+      i.src = src;
+    });
+  }
   Promise.all([
     loadImg("img/canyon.jpg"), loadImg("img/keeper-sm.png"), loadImg("img/lantern-sm.png"),
-    loadImg("img/moths-sm.png"), loadImg("img/pickups-sm.png"), loadImg("img/pests-sm.png"), loadImg("img/ground-sm.png")
-  ]).then(([canyon, keeper, lantern, moths, pickups, pests, ground]) => {
+    loadImg("img/pickups-sm.png"),
+    loadImgOpt("img/moth-pale.png"), loadImgOpt("img/pest-mosquito.png"), loadImgOpt("img/pest-wasp.png")
+  ]).then(([canyon, keeper, lantern, pickups, mothPale, pestMo, pestWasp]) => {
     assets.canyon = canyon;
     assets.keeper = keyImage(keeper, 22);
     assets.lantern = keyImage(lantern, 18);
-    assets.moths = keyImage(moths, 14);
     assets.pickups = keyImage(pickups, 14);
-    assets.pests = keyImage(pests, 14);
-    assets.ground = keyImage(ground, 14);
+    assets.mothPale = keyNearBlack(mothPale);
+    assets.pestMosquito = keyNearBlack(pestMo);
+    assets.pestWasp = keyNearBlack(pestWasp);
     assets.ready = true;
     if (bootEl) bootEl.remove();
   }).catch(() => { if (bootEl) bootEl.textContent = "art missing"; });
@@ -329,7 +353,7 @@
     for (const f of floats) {
       const a = clamp(f.life / f.max, 0, 1);
       ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = hsl(f.hue, 80, 72);
-      ctx.font = `600 ${f.size}px Palatino Linotype, Georgia, serif`;
+      ctx.font = `600 ${f.size}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = "center"; ctx.shadowColor = hsl(f.hue, 90, 50, 0.6); ctx.shadowBlur = 12;
       ctx.fillText(f.text, f.x, f.y); ctx.restore();
     }
@@ -370,7 +394,7 @@
     return r;
   }
   function pulseCdMax() { return 0.52; }
-  function scrollSpeed() { return 210 * DIFF().speed; }
+  function scrollSpeed() { return 108 * DIFF().speed; }
 
   function resetRun() {
     const d = DIFF();
@@ -627,19 +651,26 @@
   }
 
   function steering(dt) {
-    let dragging = false, followX = laneX();
+    const now = performance.now();
+    let followX = null;
     for (const p of input.pointers.values()) {
-      if (p.dragging || p.maxMove > MOVE_PX || performance.now() - p.t > TAP_MS) {
-        dragging = true; followX = p.x; p.dragging = true;
+      const held = now - p.t;
+      if (p.dragging || p.maxMove > MOVE_PX || held > TAP_MS) {
+        p.dragging = true;
+        followX = p.x;
       }
     }
     const keyL = !!input.keys.KeyA || !!input.keys.ArrowLeft;
     const keyR = !!input.keys.KeyD || !!input.keys.ArrowRight;
-    if (dragging) keeper.bank = lerp(keeper.bank, xToBank(followX), 1 - Math.pow(0.00008, dt));
-    else if (keyL !== keyR) keeper.bank = lerp(keeper.bank, keyL ? -1 : 1, 1 - Math.pow(0.012, dt));
-    else keeper.bank *= Math.pow(0.18, dt);
+    if (followX != null) {
+      const target = xToBank(followX);
+      keeper.bank = lerp(keeper.bank, target, 1 - Math.pow(0.0002, dt));
+    } else if (keyL !== keyR) {
+      keeper.bank = clamp(keeper.bank + (keyL ? -2.2 : 2.2) * dt, -1, 1);
+    }
+    // NEVER decay bank toward 0. Release = stay.
+    keeper.vis = lerp(keeper.vis, keeper.bank, 1 - Math.pow(0.002, dt));
     keeper.bank = clamp(keeper.bank, -1, 1);
-    keeper.vis = lerp(keeper.vis, keeper.bank, 1 - Math.pow(0.0009, dt));
     if (Math.abs(keeper.bank) > 0.08) keeper.facing = keeper.bank < 0 ? -1 : 1;
     keeper.roll = lerp(keeper.roll, keeper.vis * 0.12, 1 - Math.pow(0.05, dt));
     keeper.bob += dt * (8 + Math.abs(keeper.bank) * 4);
@@ -654,7 +685,7 @@
   }
 
   function updateFly(dt) {
-    run.t += dt; worldZ += dt * 11 * DIFF().speed;
+    run.t += dt; worldZ += dt * 8;
     run.invuln = Math.max(0, run.invuln - dt);
     run.shake = Math.max(0, run.shake - dt * 3.2);
     run.hitFlash = Math.max(0, run.hitFlash - dt * 2.4);
@@ -703,16 +734,16 @@
       if (e.pickup) {
         e.y += e.vy * dt; e.x += Math.sin(e.phase) * 12 * dt;
         if (Math.hypot(e.x - kp.x, e.y - kp.y) < 42) grabPickup(e);
-        if (e.y > H + 40) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
         continue;
       }
       if (e.age < 0) continue;
       if (e.def.id === "gate-orb-weaver") {
-        e.y += scrollSpeed() * 0.55 * dt;
+        e.y += scrollSpeed() * 0.5 * dt;
         const onLine = Math.abs(e.y - kp.y) < 16;
         const inGap = Math.abs(kp.x - e.gap) < e.gapW * 0.5;
         if (onLine && !inGap) hitKeeper(e, "web");
-        if (e.y > H + 40) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
         continue;
       }
       if (e.magnet || (run.magnetT > 0 && (e.kind === "aerial" || e.kind === "cliff"))) {
@@ -728,7 +759,7 @@
         e.x += wx * dt * 3;
         e.y += e.vy * dt * 0.55;
         if (e.kind === "cliff") e.x = lerp(e.x, e.side < 0 ? W * 0.11 : W * 0.89, 0.08);
-        if (e.age >= e.life + 0.7 || e.y > H + 50) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
       } else if (e.kind === "ground") {
         if (e.def.hop) {
           e.hopT += dt;
@@ -741,22 +772,21 @@
         }
         const over = Math.abs(e.x - kp.x) < 38 && Math.abs(e.y - kp.y) < 36;
         if (over && (keeper.pulseT < 0.28 || Math.abs(e.x - kp.x) < 22)) catchEnt(e);
-        if (e.y > H + 40 || e.age > e.life + 1.2) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
       } else if (e.def.id === "fen-mosquito") {
-        e.vx += (kp.x - e.x) * 1.65 * dt;
-        e.vy += (kp.y - 22 - e.y) * 0.85 * dt;
+        e.vx += (kp.x - e.x) * 1.1 * dt;
         e.vx *= 0.96;
-        e.x += e.vx * dt + Math.sin(e.phase * 3) * 40 * dt;
-        e.y += (scrollSpeed() * 0.35 + e.vy * 0.15) * dt;
+        e.x += e.vx * dt + Math.sin(e.phase * 3) * 22 * dt;
+        e.y += Math.max(70, scrollSpeed() * 0.55) * dt;
         if (Math.hypot(e.x - kp.x, e.y - (kp.y - 24)) < 26) hitKeeper(e, "bite");
-        if (e.y > H + 40) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
       } else if (e.def.id === "paper-nest-wasp") {
         if (e.dodgeT > 0) e.dodgeT -= dt;
         e.x += (e.vx + Math.sin(e.phase * 2) * 90) * dt;
-        e.y += scrollSpeed() * 0.48 * dt;
+        e.y += scrollSpeed() * 0.62 * dt;
         e.vx *= 0.9;
         if (Math.hypot(e.x - kp.x, e.y - kp.y) < 28) hitKeeper(e, "sting");
-        if (e.y > H + 40 || e.x < -40 || e.x > W + 40) e.alive = false;
+        if (e.y > H + 40 || e.x < -60 || e.x > W + 60) e.alive = false;
       }
     }
 
@@ -787,12 +817,12 @@
   function drawCanyon() {
     const img = assets.canyon;
     if (img) {
-      const scale = Math.max(W / img.width, H / img.height) * 1.18;
+      const scale = Math.max(W / img.width, H / img.height) * 1.12;
       const dw = img.width * scale, dh = img.height * scale;
       const ox = (W - dw) / 2;
-      const off = ((worldZ * 26) % dh + dh) % dh;
-      ctx.drawImage(img, ox, -off, dw, dh);
-      ctx.drawImage(img, ox, dh - off, dw, dh);
+      const extra = Math.max(0, dh - H);
+      const oy = extra > 0 ? -((worldZ * 8) % extra) : (H - dh) / 2;
+      ctx.drawImage(img, ox, oy, dw, dh);
     } else {
       const g = ctx.createLinearGradient(0, 0, 0, H);
       g.addColorStop(0, "#060414"); g.addColorStop(1, "#0a0816");
@@ -828,6 +858,131 @@
     return true;
   }
 
+  const MOTH_LOOK = {
+    "pale-wickmoth": { wing: "#f4ead6", wing2: "#e4d4b0", body: "#c4ae86", tiny: false, flash: null },
+    "ash-vein-underwing": { wing: "#4a5360", wing2: "#2c3340", body: "#343840", tiny: false, flash: "#c45a38" },
+    "velvet-snout": { wing: "#4a2c18", wing2: "#2a180e", body: "#1a1008", tiny: false, flash: null },
+    "ember-hawkmoth": { wing: "#e07028", wing2: "#8a2810", body: "#3a140c", tiny: false, flash: "#ffb060" },
+    "marsh-lampfly": { wing: "#1c3a24", wing2: "#0e2416", body: "#142018", tiny: true, flash: "#7dff6a" }
+  };
+
+  function drawMoth(e) {
+    const look = MOTH_LOOK[e.def.id] || MOTH_LOOK["pale-wickmoth"];
+    const tiny = !!look.tiny;
+    const flap = Math.sin(e.phase * (tiny ? 16 : 11));
+    const span = (e.def.r || 12) * (tiny ? 0.72 : 1.05);
+    const wy = span * (0.38 + 0.32 * Math.abs(flap));
+    if (e.def.id === "pale-wickmoth" && assets.mothPale) {
+      const s = 40;
+      ctx.drawImage(assets.mothPale, -s / 2, -s / 2, s, s);
+      return;
+    }
+    ctx.fillStyle = look.wing;
+    ctx.beginPath();
+    ctx.ellipse(-span * 0.52, -1, span * 0.88, wy, -0.38 - flap * 0.22, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = look.wing2 || look.wing;
+    ctx.beginPath();
+    ctx.ellipse(span * 0.52, -1, span * 0.88, wy, 0.38 + flap * 0.22, 0, TAU);
+    ctx.fill();
+    if (look.flash && (e.def.id === "ash-vein-underwing" || e.def.id === "ember-hawkmoth") && flap > 0.2) {
+      ctx.fillStyle = look.flash;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.ellipse(0, 3, span * 0.55, span * 0.26, 0, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    if (tiny && look.flash && Math.sin(e.phase * 6) >= 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = look.flash;
+      ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = look.body;
+    ctx.beginPath();
+    ctx.moveTo(0, -span * 0.72);
+    ctx.quadraticCurveTo(span * 0.2, 0, 0, span * 0.88);
+    ctx.quadraticCurveTo(-span * 0.2, 0, 0, -span * 0.72);
+    ctx.fill();
+    ctx.strokeStyle = look.body;
+    ctx.lineWidth = 0.9;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-1.2, -span * 0.62);
+    ctx.quadraticCurveTo(-7, -span * 1.12, -9, -span * 1.22);
+    ctx.moveTo(1.2, -span * 0.62);
+    ctx.quadraticCurveTo(7, -span * 1.12, 9, -span * 1.22);
+    ctx.stroke();
+  }
+
+  function drawGroundBug(e) {
+    const r = e.def.r || 12;
+    ctx.fillStyle = hsl(e.def.hue, 32, 26);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 1.15, r * 0.62, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = hsl(e.def.hue, 36, 16);
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.55, 0, r * 0.42, r * 0.4, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = hsl(e.def.hue, 18, 14);
+    ctx.lineWidth = 1.15;
+    ctx.lineCap = "round";
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const ox = (i - 1) * r * 0.32;
+        ctx.beginPath();
+        ctx.moveTo(ox, 2);
+        ctx.quadraticCurveTo(ox + side * r * 0.65, r * 0.32, ox + side * r * 0.95, r * 0.55);
+        ctx.stroke();
+      }
+    }
+    if (e.def.id === "bank-glowworm") {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = hsl(95, 90, 60, 0.55);
+      ctx.beginPath(); ctx.arc(r * 0.3, 0, 4, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawPestVector(e) {
+    if (e.def.id === "fen-mosquito") {
+      ctx.strokeStyle = "#2a3230"; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 6; i++) {
+        const a = -0.5 + i * 0.18;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * 13, Math.sin(a) * 9); ctx.stroke();
+      }
+      ctx.fillStyle = "#3a4448";
+      ctx.beginPath(); ctx.ellipse(0, 0, 3.6, 6.5, 0.15, 0, TAU); ctx.fill();
+    } else if (e.def.id === "paper-nest-wasp") {
+      ctx.fillStyle = "#e8c84a";
+      ctx.beginPath(); ctx.ellipse(0, 2, 5, 8, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#1a1814";
+      ctx.fillRect(-5, -1, 10, 2.4); ctx.fillRect(-5, 5, 10, 2);
+      ctx.beginPath(); ctx.ellipse(0, -6, 3.8, 3.8, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "rgba(40,40,40,0.4)";
+      ctx.beginPath(); ctx.ellipse(-8, -2, 7, 3, -0.4, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(8, -2, 7, 3, 0.4, 0, TAU); ctx.fill();
+    } else {
+      ctx.fillStyle = "#6a4a32";
+      ctx.beginPath(); ctx.ellipse(0, 2, 7, 8, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#3a2818";
+      ctx.beginPath(); ctx.arc(0, -4, 4, 0, TAU); ctx.fill();
+    }
+  }
+
+  function drawSpecimen(def, phase) {
+    const e = { def: def, phase: phase || 0 };
+    if (def.sheet === "moths") drawMoth(e);
+    else if (def.sheet === "ground") drawGroundBug(e);
+    else if (def.id === "fen-mosquito" && assets.pestMosquito) ctx.drawImage(assets.pestMosquito, -20, -20, 40, 40);
+    else if (def.id === "paper-nest-wasp" && assets.pestWasp) ctx.drawImage(assets.pestWasp, -20, -20, 40, 40);
+    else drawPestVector(e);
+  }
+
   function drawEnt(e) {
     if (e.age < 0 || !e.alive) return;
     if (e.pickup) { drawPickup(e); return; }
@@ -836,13 +991,14 @@
       ctx.strokeStyle = "rgba(220,200,170,0.55)"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(0, e.y); ctx.lineTo(e.gap - e.gapW * 0.5, e.y); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(e.gap + e.gapW * 0.5, e.y); ctx.lineTo(W, e.y); ctx.stroke();
-      const cell = sheetCell(assets.pests, 3, 1, 2);
-      const sx = 22;
-      drawSheet(cell, e.gap - e.gapW * 0.5 - sx, e.y - sx, sx * 2, sx * 2);
+      ctx.save();
+      ctx.translate(e.gap - e.gapW * 0.5, e.y);
+      drawPestVector(e);
+      ctx.restore();
       ctx.restore();
       return;
     }
-    const fade = e.age > e.life ? 1 - (e.age - e.life) / 0.7 : 1;
+    const fade = e.y > H - 30 ? 1 - (e.y - (H - 30)) / 70 : 1;
     ctx.save(); ctx.translate(e.x, e.y); ctx.globalAlpha = clamp(fade, 0, 1);
     ctx.save(); ctx.globalCompositeOperation = "lighter";
     const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, e.def.r * 3.2);
@@ -852,17 +1008,17 @@
     ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, e.def.r * 3.2, 0, TAU); ctx.fill();
     ctx.restore();
 
-    const s = e.def.r * 3.2;
-    let drawn = false;
     if (e.def.sheet === "moths") {
-      const f = e.def.i + (((e.phase * 1.4) | 0) % 2 === 0 ? 0 : 0);
-      drawn = drawSheet(sheetCell(assets.moths, 3, 3, f), -s, -s * 0.7, s * 2, s * 1.4);
+      drawMoth(e);
     } else if (e.def.sheet === "ground") {
-      drawn = drawSheet(sheetCell(assets.ground, 2, 2, e.def.i), -s * 1.05, -s * 0.7, s * 2.1, s * 1.4);
+      drawGroundBug(e);
+    } else if (e.def.id === "fen-mosquito" && assets.pestMosquito) {
+      ctx.drawImage(assets.pestMosquito, -20, -20, 40, 40);
+    } else if (e.def.id === "paper-nest-wasp" && assets.pestWasp) {
+      ctx.drawImage(assets.pestWasp, -20, -20, 40, 40);
     } else if (e.def.sheet === "pests") {
-      drawn = drawSheet(sheetCell(assets.pests, 3, 1, e.def.i), -s * 1.1, -s * 0.75, s * 2.2, s * 1.5);
-    }
-    if (!drawn) {
+      drawPestVector(e);
+    } else {
       ctx.fillStyle = hsl(e.def.hue, 80, 60, 0.85);
       ctx.beginPath(); ctx.ellipse(0, 0, e.def.r * 1.3, e.def.r * 0.7, Math.sin(e.phase) * 0.3, 0, TAU); ctx.fill();
     }
@@ -952,42 +1108,42 @@
     const pad = Math.max(14, W * 0.04), top = Math.max(22, H * 0.038);
     ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.75)"; ctx.shadowBlur = 10;
     ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(255,236,210,0.5)";
-    ctx.font = `600 ${Math.round(Math.max(11, W * 0.03))}px Palatino Linotype, Georgia, serif`;
-    ctx.fillText("NECTAR", pad, top);
-    ctx.fillStyle = "#f4ead8";
-    ctx.font = `700 ${Math.round(Math.max(20, W * 0.052))}px Palatino Linotype, Georgia, serif`;
+    ctx.fillStyle = "rgba(232,234,237,0.5)";
+    ctx.font = `600 ${Math.round(Math.max(11, W * 0.03))}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.fillText("Nectar", pad, top);
+    ctx.fillStyle = "#e8eaed";
+    ctx.font = `700 ${Math.round(Math.max(20, W * 0.052))}px ui-sans-serif, system-ui, sans-serif`;
     ctx.fillText(String(run.nectar), pad, top + 22);
     ctx.textAlign = "right";
     const remain = Math.max(0, run.dur - run.t);
     const mm = Math.floor(remain / 60), ss = Math.floor(remain % 60);
-    ctx.fillStyle = "rgba(255,236,210,0.5)";
-    ctx.font = `600 ${Math.round(Math.max(11, W * 0.03))}px Palatino Linotype, Georgia, serif`;
-    ctx.fillText("NIGHT", W - pad, top);
-    ctx.fillStyle = remain < 8 ? "rgba(255,170,110,0.95)" : "#f4ead8";
-    ctx.font = `700 ${Math.round(Math.max(20, W * 0.052))}px Palatino Linotype, Georgia, serif`;
+    ctx.fillStyle = "rgba(232,234,237,0.5)";
+    ctx.font = `600 ${Math.round(Math.max(11, W * 0.03))}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.fillText("Night", W - pad, top);
+    ctx.fillStyle = remain < 8 ? "#e8eaed" : "#e8eaed";
+    ctx.font = `700 ${Math.round(Math.max(20, W * 0.052))}px ui-sans-serif, system-ui, sans-serif`;
     ctx.fillText(`${mm}:${ss.toString().padStart(2, "0")}`, W - pad, top + 22);
     const wickY = top + 40;
     ctx.textAlign = "center";
-    ctx.font = `600 ${Math.round(Math.max(10, W * 0.026))}px Palatino Linotype, Georgia, serif`;
-    ctx.fillStyle = "rgba(255,236,210,0.5)"; ctx.fillText("WICK", W / 2, wickY);
+    ctx.font = `600 ${Math.round(Math.max(10, W * 0.026))}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.fillStyle = "rgba(232,234,237,0.5)"; ctx.fillText("Wick", W / 2, wickY);
     for (let i = 0; i < run.wickMax; i++) {
       const x = W / 2 + (i - (run.wickMax - 1) / 2) * 20, y = wickY + 14, on = i < run.wick;
       ctx.fillStyle = on ? "rgba(255,210,120,0.95)" : "rgba(70,50,40,0.55)";
       ctx.beginPath(); ctx.moveTo(x, y + 6); ctx.quadraticCurveTo(x - 5, y + 1, x, y - 8); ctx.quadraticCurveTo(x + 5, y + 1, x, y + 6); ctx.fill();
     }
     if (run.combo >= 1) {
-      ctx.font = `700 ${Math.round(22 + comboPop * 12)}px Palatino Linotype, Georgia, serif`;
-      ctx.fillStyle = run.kindledT > 0 ? "rgba(255,210,120,0.95)" : "#f4ead8";
+      ctx.font = `700 ${Math.round(22 + comboPop * 12)}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.fillStyle = "#e8eaed";
       ctx.fillText(String(fibStep(run.combo)), W / 2, wickY + 48);
-      ctx.font = "600 11px Palatino Linotype, Georgia, serif";
-      ctx.fillStyle = "rgba(255,236,210,0.5)";
+      ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillStyle = "rgba(232,234,237,0.5)";
       ctx.fillText(run.kindledT > 0 ? "kindled" : "combo", W / 2, wickY + 62);
     }
     if (lastCatchT > 0) {
       ctx.globalAlpha = clamp(lastCatchT * 1.5, 0, 1);
-      ctx.font = `italic ${Math.round(Math.max(13, W * 0.034))}px Palatino Linotype, Georgia, serif`;
-      ctx.fillStyle = "rgba(255,220,170,0.92)";
+      ctx.font = `italic ${Math.round(Math.max(13, W * 0.034))}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.fillStyle = "rgba(232,234,237,0.92)";
       ctx.fillText(lastCatchName, W / 2, wickY + 84);
       ctx.globalAlpha = 1;
     }
@@ -996,14 +1152,14 @@
     if (run.aegisT > 0) buffs.push("aegis " + run.aegisT.toFixed(1));
     if (run.veilT > 0) buffs.push("veil");
     if (buffs.length) {
-      ctx.font = "11px Palatino Linotype, Georgia, serif";
+      ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
       ctx.fillStyle = "rgba(180,220,255,0.75)";
       ctx.fillText(buffs.join("  ·  "), W / 2, H - 22);
     }
     ctx.restore();
     if (state === STATE.FLY && (teachTap || teachHold)) {
       ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,230,190,0.8)";
-      ctx.font = "600 13px Palatino Linotype, Georgia, serif";
+      ctx.font = "600 13px ui-sans-serif, system-ui, sans-serif";
       ctx.globalAlpha = 0.4 + 0.25 * Math.sin(time * 5);
       if (run.t < 3.2 && teachTap) ctx.fillText("TAP  ·  swing lantern", W / 2, H * 0.88);
       else if (run.t < 8 && teachHold) ctx.fillText("DRAG  ·  strafe the trail", W / 2, H * 0.88);
@@ -1025,55 +1181,69 @@
   }
 
   function drawTitle() {
-    ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "#f4ead8";
-    ctx.shadowColor = "rgba(255,160,60,0.35)"; ctx.shadowBlur = 24;
-    ctx.font = `600 ${Math.round(W * 0.13)}px Palatino Linotype, Georgia, serif`;
-    ctx.fillText("KINDLED", W / 2, H * 0.2);
-    ctx.shadowBlur = 0;
-    ctx.font = "italic 13px Palatino Linotype, Georgia, serif";
-    ctx.fillStyle = "rgba(244,234,216,0.45)"; ctx.fillText("working title", W / 2, H * 0.2 + 22);
-    ctx.font = "14px Palatino Linotype, Georgia, serif";
-    ctx.fillStyle = `rgba(244,234,216,${0.4 + 0.3 * Math.sin(titlePulse * 2.4)})`;
+    ctx.save(); ctx.textAlign = "center";
+    ctx.letterSpacing = "0px";
+    ctx.fillStyle = "rgba(232,234,237,0.7)";
+    ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText("KINDLED", W / 2, H * 0.18);
+    ctx.fillStyle = "#e8eaed";
+    ctx.font = "600 28px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText("Night Canyon", W / 2, H * 0.18 + 34);
+    ctx.font = "14px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillStyle = `rgba(232,234,237,${0.4 + 0.3 * Math.sin(titlePulse * 2.4)})`;
     ctx.fillText("tap to roost", W / 2, H * 0.9);
-    ctx.font = "11px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.32)";
+    ctx.font = "11px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.4)";
     ctx.fillText("night hike  ·  lantern is a tool  ·  field guide", W / 2, H * 0.935);
     ctx.restore();
   }
 
   function drawRoost() {
     hits.length = 0;
-    ctx.fillStyle = "rgba(6,5,14,0.55)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(6,8,12,0.55)"; ctx.fillRect(0, 0, W, H);
     if (roostView === "hub") drawHub();
     else if (roostView === "map") drawMap();
     else if (roostView === "trophy") drawTrophy();
     else if (roostView === "card") drawCard();
   }
 
+  function panelScrim(x, y, w, h) {
+    rr(x, y, w, h, 12);
+    ctx.fillStyle = "rgba(8,10,14,0.78)";
+    ctx.fill();
+  }
   function pill(id, x, y, w, h, label, on) {
     rr(x, y, w, h, 8);
-    ctx.fillStyle = on ? "rgba(70,48,22,0.9)" : "rgba(18,16,28,0.75)";
-    ctx.strokeStyle = on ? "rgba(255,200,120,0.75)" : "rgba(255,200,120,0.25)";
-    ctx.lineWidth = on ? 1.6 : 1; ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#f4ead8"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = "600 12px Palatino Linotype, Georgia, serif";
+    ctx.fillStyle = on ? "#3a3224" : "#1a1d24";
+    ctx.strokeStyle = "#3c4043";
+    ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = on ? "#e8eaed" : "#c5c8ce";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.letterSpacing = "0px";
+    ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(label, x + w / 2, y + h / 2);
     ctx.textBaseline = "alphabetic";
     addHit(id, x, y, w, h);
   }
 
   function drawHub() {
-    ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "#f4ead8";
-    ctx.font = "600 22px Palatino Linotype, Georgia, serif";
-    ctx.fillText("roost", W / 2, H * 0.07);
-    ctx.font = "12px Palatino Linotype, Georgia, serif";
-    ctx.fillStyle = "rgba(244,234,216,0.55)";
-    ctx.fillText("lv " + heroLevel() + "   ·   nectar " + save.nectar + "   ·   nights " + save.nights, W / 2, H * 0.105);
-    const barW = W * 0.5, bx = (W - barW) / 2, by = H * 0.12;
-    ctx.fillStyle = "rgba(255,236,210,0.12)"; rr(bx, by, barW, 6, 3); ctx.fill();
-    ctx.fillStyle = "rgba(255,196,110,0.85)"; rr(bx, by, barW * (xpInto() / 70), 6, 3); ctx.fill();
+    ctx.save(); ctx.textAlign = "center"; ctx.letterSpacing = "0px";
+    panelScrim(W * 0.08, H * 0.03, W * 0.84, H * 0.12);
+    ctx.fillStyle = "rgba(232,234,237,0.7)";
+    ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText("KINDLED", W / 2, H * 0.055);
+    ctx.fillStyle = "#e8eaed";
+    ctx.font = "600 28px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText("Night Canyon", W / 2, H * 0.1);
+    ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillStyle = "rgba(232,234,237,0.62)";
+    ctx.fillText("lv " + heroLevel() + "   ·   nectar " + save.nectar + "   ·   nights " + save.nights, W / 2, H * 0.13);
+    const barW = W * 0.5, bx = (W - barW) / 2, by = H * 0.142;
+    ctx.fillStyle = "rgba(232,234,237,0.12)"; rr(bx, by, barW, 6, 3); ctx.fill();
+    ctx.fillStyle = "rgba(232,234,237,0.55)"; rr(bx, by, barW * (xpInto() / 70), 6, 3); ctx.fill();
     const kimg = assets.keeper;
     if (kimg) ctx.drawImage(kimg, W / 2 - 48, H * 0.145, 96, 96 * (kimg.height / kimg.width));
-    ctx.fillStyle = "rgba(244,234,216,0.5)"; ctx.font = "11px Palatino Linotype, Georgia, serif";
+    panelScrim(W * 0.08, H * 0.385, W * 0.84, H * 0.09);
+    ctx.fillStyle = "rgba(232,234,237,0.55)"; ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText("difficulty", W / 2, H * 0.40);
     const diffs = ["watch", "keep", "ember"];
     const dw = W * 0.26, gap = W * 0.03, x0 = (W - (dw * 3 + gap * 2)) / 2;
@@ -1081,37 +1251,38 @@
       const D = DIFFS[id];
       pill("diff:" + id, x0 + i * (dw + gap), H * 0.415, dw, 36, D.name + "  " + D.wick + " wick", save.difficulty === id);
     });
-    ctx.fillStyle = "rgba(244,234,216,0.5)"; ctx.font = "11px Palatino Linotype, Georgia, serif";
+    panelScrim(W * 0.08, H * 0.485, W * 0.84, H * 0.175);
+    ctx.fillStyle = "rgba(232,234,237,0.55)"; ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText("loadout  ·  tap to toggle", W / 2, H * 0.50);
     ABILITIES.forEach((a, i) => {
       const cw = W * 0.28, cg = W * 0.03, ax = (W - (cw * 3 + cg * 2)) / 2 + i * (cw + cg);
       const on = !!save.equipped[a.id];
       rr(ax, H * 0.515, cw, H * 0.13, 10);
-      ctx.fillStyle = on ? "rgba(60,40,20,0.88)" : "rgba(16,14,24,0.72)";
-      ctx.strokeStyle = on ? "rgba(255,200,120,0.7)" : "rgba(255,200,120,0.22)";
-      ctx.lineWidth = on ? 1.6 : 1; ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#f4ead8"; ctx.font = "600 12px Palatino Linotype, Georgia, serif";
+      ctx.fillStyle = on ? "#3a3224" : "#1a1d24";
+      ctx.strokeStyle = "#3c4043";
+      ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = on ? "#e8eaed" : "#c5c8ce"; ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
       ctx.fillText(a.name, ax + cw / 2, H * 0.545);
-      ctx.font = "10px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.55)";
+      ctx.font = "10px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.55)";
       wrapText(a.sub, ax + cw / 2, H * 0.57, cw - 10, 12);
-      ctx.fillStyle = "rgba(255,196,110,0.55)"; ctx.font = "italic 10px Palatino Linotype, Georgia, serif";
+      ctx.fillStyle = "rgba(232,234,237,0.45)"; ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
       ctx.fillText("chip " + (save.chips[a.id] || 0), ax + cw / 2, H * 0.625);
       addHit("ab:" + a.id, ax, H * 0.515, cw, H * 0.13);
     });
     pill("play", W * 0.18, H * 0.68, W * 0.64, 48, "play  Night Canyon", true);
     pill("map", W * 0.08, H * 0.78, W * 0.4, 40, "campaign", false);
     pill("trophy", W * 0.52, H * 0.78, W * 0.4, 40, "trophy room", false);
-    ctx.font = "11px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.35)";
+    ctx.font = "11px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.35)";
     ctx.fillText("TAP pulse  ·  DRAG strafe  ·  A/D  ·  Space", W / 2, H * 0.88);
     ctx.fillText("Reed Marsh · Cliff Garden · Sky-Ruins locked", W / 2, H * 0.91);
     ctx.restore();
   }
 
   function drawMap() {
-    ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "#f4ead8";
-    ctx.font = "600 20px Palatino Linotype, Georgia, serif";
-    ctx.fillText("campaign", W / 2, H * 0.1);
-    ctx.font = "12px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.5)";
+    ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "#e8eaed";
+    ctx.font = "600 20px ui-sans-serif, system-ui, sans-serif";
+    panelScrim(W * 0.12, H * 0.055, W * 0.76, 90); ctx.fillText("campaign", W / 2, H * 0.1);
+    ctx.font = "12px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.5)";
     ctx.fillText("one ribbon per landscape", W / 2, H * 0.135);
     ctx.strokeStyle = "rgba(255,186,90,0.35)"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(W * 0.22, H * 0.28); ctx.quadraticCurveTo(W * 0.7, H * 0.4, W * 0.3, H * 0.55);
@@ -1126,9 +1297,9 @@
       ctx.beginPath(); ctx.arc(n.x, n.y, 14, 0, TAU);
       ctx.fillStyle = n.L.locked ? "rgba(20,18,28,0.85)" : "rgba(80,50,20,0.9)";
       ctx.fill(); ctx.strokeStyle = n.L.locked ? "rgba(255,200,120,0.25)" : "rgba(255,200,120,0.8)"; ctx.stroke();
-      ctx.fillStyle = "#f4ead8"; ctx.font = "600 13px Palatino Linotype, Georgia, serif";
+      ctx.fillStyle = "#e8eaed"; ctx.font = "600 13px ui-sans-serif, system-ui, sans-serif";
       ctx.fillText(n.L.name, n.x, n.y + 32);
-      ctx.font = "10px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.45)";
+      ctx.font = "10px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.45)";
       ctx.fillText(n.L.locked ? "LOCKED  ·  " + n.L.note : n.L.note, n.x, n.y + 46);
       addHit(n.L.locked ? "locked" : "play", n.x - 50, n.y - 18, 100, 70);
     });
@@ -1147,9 +1318,9 @@
   }
 
   function drawTrophy() {
-    ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "#f4ead8";
-    ctx.font = "600 20px Palatino Linotype, Georgia, serif";
-    ctx.fillText("trophy room", W / 2, H * 0.08);
+    ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "#e8eaed";
+    ctx.font = "600 20px ui-sans-serif, system-ui, sans-serif";
+    panelScrim(W * 0.1, H * 0.04, W * 0.8, 110); ctx.fillText("trophy room", W / 2, H * 0.08);
     const filts = [["all", "All"], ["aerial", "Aerial"], ["ground", "Ground"], ["pests", "Pests"]];
     const fw = W * 0.2, fg = 6, fx0 = (W - (fw * 4 + fg * 3)) / 2;
     filts.forEach((f, i) => pill("filt:" + f[0], fx0 + i * (fw + fg), H * 0.11, fw, 30, f[1], trophyFilter === f[0]));
@@ -1161,21 +1332,17 @@
       const x = x0 + c * (cw + g), y = y0 + r * (ch + 10);
       const caught = seenDex(s.id);
       rr(x, y, cw, ch, 10);
-      ctx.fillStyle = "rgba(16,14,26,0.78)"; ctx.strokeStyle = "rgba(255,200,120,0.28)";
+      ctx.fillStyle = "rgba(8,10,14,0.78)"; ctx.strokeStyle = "#3c4043";
       ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
       ctx.save();
       ctx.translate(x + cw / 2, y + 34);
       if (!caught) { ctx.filter = "brightness(0)"; ctx.globalAlpha = 0.5; }
-      const ss = 18;
-      if (s.sheet === "moths") drawSheet(sheetCell(assets.moths, 3, 3, s.i), -ss, -ss * 0.7, ss * 2, ss * 1.4);
-      else if (s.sheet === "ground") drawSheet(sheetCell(assets.ground, 2, 2, s.i), -ss, -ss * 0.7, ss * 2, ss * 1.4);
-      else if (s.sheet === "pests") drawSheet(sheetCell(assets.pests, 3, 1, s.i), -ss, -ss * 0.7, ss * 2, ss * 1.4);
-      else { ctx.fillStyle = hsl(s.hue, 70, caught ? 60 : 20, 0.9); ctx.beginPath(); ctx.arc(0, 0, 12, 0, TAU); ctx.fill(); }
+      drawSpecimen(s, time * 5);
       ctx.restore();
-      ctx.fillStyle = caught ? "#f4ead8" : "rgba(244,234,216,0.4)";
-      ctx.font = "600 10px Palatino Linotype, Georgia, serif";
+      ctx.fillStyle = caught ? "#e8eaed" : "rgba(232,234,237,0.4)";
+      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
       wrapText(caught ? s.commonName : "????", x + cw / 2, y + 58, cw - 8, 11);
-      ctx.font = "9px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.4)";
+      ctx.font = "9px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.4)";
       ctx.fillText(caught ? dexCount(s.id) + " logged" : s.rarity, x + cw / 2, y + ch - 12);
       addHit("card:" + s.id, x, y, cw, ch);
     });
@@ -1188,20 +1355,17 @@
     const caught = seenDex(s.id);
     ctx.save(); ctx.textAlign = "center";
     rr(W * 0.08, H * 0.1, W * 0.84, H * 0.72, 16);
-    ctx.fillStyle = "rgba(14,12,22,0.92)"; ctx.strokeStyle = "rgba(255,200,120,0.45)";
+    ctx.fillStyle = "rgba(8,10,14,0.92)"; ctx.strokeStyle = "#3c4043";
     ctx.lineWidth = 1.4; ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#f4ead8";
-    ctx.font = "600 20px Palatino Linotype, Georgia, serif";
+    ctx.fillStyle = "#e8eaed";
+    ctx.font = "600 20px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(caught ? s.commonName : "Unknown specimen", W / 2, H * 0.18);
-    ctx.font = "italic 13px Palatino Linotype, Georgia, serif";
-    ctx.fillStyle = "rgba(255,210,140,0.7)";
+    ctx.font = "italic 13px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillStyle = "rgba(232,234,237,0.7)";
     ctx.fillText(caught ? s.latin : "— —", W / 2, H * 0.215);
     ctx.save(); ctx.translate(W / 2, H * 0.30);
     if (!caught) { ctx.filter = "brightness(0)"; ctx.globalAlpha = 0.45; }
-    const ss = 28;
-    if (s.sheet === "moths") drawSheet(sheetCell(assets.moths, 3, 3, s.i), -ss, -ss * 0.7, ss * 2, ss * 1.4);
-    else if (s.sheet === "ground") drawSheet(sheetCell(assets.ground, 2, 2, s.i), -ss, -ss * 0.7, ss * 2, ss * 1.4);
-    else if (s.sheet === "pests") drawSheet(sheetCell(assets.pests, 3, 1, s.i), -ss, -ss * 0.7, ss * 2, ss * 1.4);
+    drawSpecimen(s, time * 5);
     ctx.restore();
     const lines = caught ? [
       "rarity   " + s.rarity,
@@ -1212,7 +1376,7 @@
       "habitat   " + s.habitat,
       "times caught   " + dexCount(s.id)
     ] : ["silhouette until first catch", "walk the canyon. pulse. log it."];
-    ctx.font = "12px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.75)";
+    ctx.font = "12px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237,0.75)";
     lines.forEach((ln, i) => wrapText(ln, W / 2, H * 0.42 + i * 22, W * 0.72, 15));
     pill("back", W * 0.3, H * 0.86, W * 0.4, 40, "back", false);
     ctx.restore();
@@ -1223,10 +1387,10 @@
     ctx.save();
     ctx.fillStyle = run.crashed ? "rgba(255,90,50," + (a * 0.18) + ")" : "rgba(255,180,80," + (a * 0.16) + ")";
     ctx.fillRect(0, 0, W, H);
-    ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,236,210," + a + ")";
-    ctx.font = "600 26px Palatino Linotype, Georgia, serif";
+    ctx.textAlign = "center"; ctx.fillStyle = "rgba(232,234,237," + a + ")";
+    ctx.font = "600 26px ui-sans-serif, system-ui, sans-serif";
     ctx.fillText(run.crashed ? "wick spent" : "home", W / 2, H * 0.38);
-    ctx.font = "13px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(255,236,210," + (a * 0.65) + ")";
+    ctx.font = "13px ui-sans-serif, system-ui, sans-serif"; ctx.fillStyle = "rgba(232,234,237," + (a * 0.65) + ")";
     ctx.fillText("+" + run.nectar + " nectar   ·   " + run.catches + " specimens", W / 2, H * 0.43);
     ctx.restore();
   }
