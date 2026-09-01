@@ -734,7 +734,7 @@
     liveCount++;
   }
 
-  const input = { pointers: new Map(), keys: Object.create(null) };
+  const input = { pointers: new Map(), keys: Object.create(null), spacePlayOk: true };
 
   function onPointerDown(e) {
     e.preventDefault(); SFX.resume();
@@ -798,11 +798,13 @@
     }
     if (e.code === "Space") {
       e.preventDefault();
-      if (state === STATE.TITLE) openRoost();
-      else if (state === STATE.FLY && !e.repeat) {
+      if (state === STATE.TITLE) {
+        openRoost();
+        input.spacePlayOk = false;
+      } else if (state === STATE.FLY && !e.repeat) {
         if (isRidge()) doJump();
         else doPulse();
-      } else if (state === STATE.ROOST && roostView === "hub" && !e.repeat) startFlight();
+      } else if (state === STATE.ROOST && roostView === "hub" && !e.repeat && input.spacePlayOk) startFlight();
     }
     if ((e.code === "ArrowUp" || e.code === "KeyW") && state === STATE.FLY && isRidge() && !e.repeat) {
       e.preventDefault();
@@ -815,7 +817,10 @@
     if (e.code === "Enter" && state === STATE.ROOST && roostView === "hub") startFlight();
     if (e.code === "Escape" && state === STATE.ROOST) { roostView = "hub"; cardId = null; }
   });
-  window.addEventListener("keyup", (e) => { input.keys[e.code] = false; });
+  window.addEventListener("keyup", (e) => {
+    input.keys[e.code] = false;
+    if (e.code === "Space") input.spacePlayOk = true;
+  });
 
   function hitAt(x, y) {
     for (let i = hits.length - 1; i >= 0; i--) {
@@ -841,7 +846,15 @@
     else if (h.id === "locked") floatText(W / 2, H * 0.42, "locked", { hue: 30, size: 16, life: 0.7 });
   }
 
+  function keepTrail() {
+    const trail = (state === STATE.FLY || state === STATE.LAND)
+      ? (runView === "ridge" ? "ridge" : "path")
+      : (save.view === "ridge" ? "ridge" : "path");
+    save.view = trail;
+    persist();
+  }
   function openRoost(fromLand) {
+    if (fromLand) keepTrail();
     state = STATE.ROOST; roostView = "hub"; roostT = fromLand ? 0 : 0.35; cardId = null;
   }
   function startFlight() {
@@ -855,7 +868,7 @@
     save.xp += Math.max(8, run.nectar + run.catches * 2);
     save.bestCombo = Math.max(save.bestCombo || 0, run.bestCombo);
     ["wide", "step", "veil"].forEach((a) => { if (save.equipped[a]) save.chips[a] = Math.min(12, (save.chips[a] || 0) + 1); });
-    persist();
+    keepTrail();
     SFX.land(); vibe(run.crashed ? [30, 40, 50] : [20, 40, 20]);
   }
 
