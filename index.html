@@ -74,7 +74,7 @@ html, body {
   </div>
   <div id="boot">kindling…</div>
   <script>
-/* KINDLED — web slice. Vanilla canvas. TAP pulse / HOLD bank. */
+/* KINDLED — web slice. Vanilla canvas. TAP pulse / DRAG bank. */
 (() => {
   "use strict";
 
@@ -85,37 +85,40 @@ html, body {
   const TAU = Math.PI * 2;
   const SAVE_KEY = "kindled-slice-v1";
   const FIB = [1, 2, 3, 5, 8, 12, 18, 24, 36];
+  const TAP_MS = 180;
+  const MOVE_PX = 12;
+  const WICK_MAX = 3;
 
   const MOTHS = {
     wickling: {
       id: "wickling", name: "Wickling", rarity: "common",
-      nectar: 4, r: 11, hue: 32, sat: 90, light: 58, wobble: 0.9, speed: 165,
-      spawnW: 1.0, audio: "soft",
+      nectar: 4, r: 12, hue: 32, sat: 90, light: 58, wobble: 0.85, speed: 150,
+      spawnW: 1.0, audio: "soft", mag: 1,
     },
     glasswing: {
       id: "glasswing", name: "Glasswing", rarity: "uncommon",
-      nectar: 9, r: 13, hue: 185, sat: 35, light: 78, wobble: 1.4, speed: 190,
-      spawnW: 0.28, audio: "glass", pale: true,
+      nectar: 9, r: 14, hue: 185, sat: 35, light: 78, wobble: 1.45, speed: 198,
+      spawnW: 0.28, audio: "glass", pale: true, mag: 0.82,
     },
     skipper: {
       id: "skipper", name: "Reed-Skipper", rarity: "common",
-      nectar: 5, r: 10, hue: 92, sat: 70, light: 55, wobble: 2.6, speed: 230,
-      spawnW: 0.45, audio: "zip", zigzag: true,
+      nectar: 5, r: 10, hue: 92, sat: 70, light: 55, wobble: 2.7, speed: 242,
+      spawnW: 0.45, audio: "zip", zigzag: true, mag: 0.78,
     },
     choir: {
       id: "choir", name: "Choir Ember", rarity: "uncommon",
-      nectar: 7, r: 9, hue: 8, sat: 85, light: 62, wobble: 1.1, speed: 175,
-      spawnW: 0.18, audio: "choir", trio: true,
+      nectar: 7, r: 9, hue: 8, sat: 85, light: 62, wobble: 1.1, speed: 178,
+      spawnW: 0.18, audio: "choir", trio: true, mag: 0.9,
     },
     vault: {
       id: "vault", name: "Vault Moth", rarity: "rare",
-      nectar: 18, r: 16, hue: 268, sat: 55, light: 64, wobble: 0.5, speed: 130,
-      spawnW: 0.08, audio: "deep", shadow: true,
+      nectar: 18, r: 17, hue: 268, sat: 55, light: 64, wobble: 0.5, speed: 128,
+      spawnW: 0.08, audio: "deep", shadow: true, mag: 1.05,
     },
     spark: {
       id: "spark", name: "Spark Mite", rarity: "common",
-      nectar: 3, r: 7, hue: 48, sat: 100, light: 68, wobble: 3.2, speed: 260,
-      spawnW: 0.35, audio: "tick",
+      nectar: 3, r: 7, hue: 48, sat: 100, light: 68, wobble: 3.3, speed: 268,
+      spawnW: 0.35, audio: "tick", mag: 0.7,
     },
   };
   const MOTH_LIST = Object.values(MOTHS);
@@ -126,18 +129,10 @@ html, body {
     { id: "beacon", name: "Roost Beacon", sub: "+25% nectar this flight", chip: "+1 nectar on commons forever" },
   ];
 
-  // ─── save ────────────────────────────────────────────────────────────────
   function defaultSave() {
     return {
-      flights: 0,
-      nectar: 0,
-      pulseChip: 0, // +2% radius, cap +20
-      cdChip: 0,    // -0.02s, floor 0.40
-      nectChip: 0,  // +1 common, cap 8
-      roost: 1,
-      relics: 0,
-      bestCombo: 0,
-      seenTeach: false,
+      flights: 0, nectar: 0, pulseChip: 0, cdChip: 0, nectChip: 0,
+      roost: 1, relics: 0, bestCombo: 0, seenTeach: false,
     };
   }
   let save = defaultSave();
@@ -149,14 +144,8 @@ html, body {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) {}
   }
 
-  // ─── audio ───────────────────────────────────────────────────────────────
   const SFX = {
-    ctx: null,
-    master: null,
-    drone: null,
-    muted: false,
-    lastGlass: 0,
-
+    ctx: null, master: null, drone: null, muted: false, lastGlass: 0,
     ensure() {
       if (this.ctx) return;
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -247,6 +236,15 @@ html, body {
       this.osc("sine", 1480, 0.02, 0.35, 0.07);
       this.osc("sine", 1760, 0.03, 0.4, 0.05, 8);
     },
+    hit() {
+      this.noise(0.01, 0.28, 0.5, 80, 700);
+      this.osc("sawtooth", 70, 0.008, 0.32, 0.28);
+      this.osc("sine", 140, 0.01, 0.22, 0.18);
+    },
+    burn() {
+      this.noise(0.01, 0.16, 0.28, 400, 2200);
+      this.osc("triangle", 320, 0.005, 0.14, 0.16);
+    },
     land() {
       const t0 = this.now();
       [196, 246.94, 311.13, 392].forEach((f, i) => {
@@ -261,14 +259,17 @@ html, body {
         o.start(t); o.stop(t + 0.85);
       });
     },
+    crashLand() {
+      this.noise(0.02, 0.45, 0.32, 60, 500);
+      this.osc("sine", 90, 0.02, 0.5, 0.22);
+      this.land();
+    },
     relic() {
       this.osc("sine", 392, 0.02, 0.5, 0.18);
       this.osc("triangle", 784, 0.04, 0.55, 0.12);
       this.osc("sine", 1176, 0.06, 0.4, 0.08);
     },
-    ui() {
-      this.osc("sine", 440, 0.005, 0.08, 0.1);
-    },
+    ui() { this.osc("sine", 440, 0.005, 0.08, 0.1); },
     startDrone() {
       if (!this.ctx || this.drone) return;
       const make = (freq, type, g, detune) => {
@@ -276,8 +277,7 @@ html, body {
         const gain = this.ctx.createGain();
         const lfo = this.ctx.createOscillator();
         const lfoG = this.ctx.createGain();
-        o.type = type;
-        o.frequency.value = freq;
+        o.type = type; o.frequency.value = freq;
         if (detune) o.detune.value = detune;
         gain.gain.value = g;
         lfo.frequency.value = 0.07 + Math.random() * 0.05;
@@ -287,60 +287,45 @@ html, body {
         o.start(); lfo.start();
         return { o, gain, lfo };
       };
-      this.drone = [
-        make(55, "sine", 0.07, 0),
-        make(82.4, "triangle", 0.035, -6),
-        make(110, "sine", 0.02, 4),
-      ];
+      this.drone = [make(55, "sine", 0.07, 0), make(82.4, "triangle", 0.035, -6), make(110, "sine", 0.02, 4)];
     },
   };
 
   function vibe(ms) {
-    try {
-      if (navigator.vibrate) navigator.vibrate(ms);
-    } catch (_) {}
+    try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {}
   }
 
-  // ─── layout ──────────────────────────────────────────────────────────────
   let W = 405, H = 720, dpr = 1;
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const aspect = 9 / 16;
+    const vw = window.innerWidth, vh = window.innerHeight, aspect = 9 / 16;
     let cssW, cssH;
-    if (vw / vh > aspect) {
-      cssH = vh;
-      cssW = vh * aspect;
-    } else {
-      cssW = vw;
-      cssH = vw / aspect;
-    }
+    if (vw / vh > aspect) { cssH = vh; cssW = vh * aspect; }
+    else { cssW = vw; cssH = vw / aspect; }
     canvas.style.width = cssW + "px";
     canvas.style.height = cssH + "px";
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    W = cssW;
-    H = cssH;
+    W = cssW; H = cssH;
   }
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", () => setTimeout(resize, 80));
   resize();
 
-  // ─── helpers ─────────────────────────────────────────────────────────────
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const rand = (a, b) => a + Math.random() * (b - a);
-  const pick = (arr) => arr[(Math.random() * arr.length) | 0];
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
-  const easeIn = (t) => t * t;
-
+  const smoothstep = (t) => t * t * (3 - 2 * t);
   function hsl(h, s, l, a) {
     return a == null ? `hsl(${h},${s}%,${l}%)` : `hsla(${h},${s}%,${l}%,${a})`;
   }
+  function toLocal(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: ((clientX - rect.left) / rect.width) * W, y: ((clientY - rect.top) / rect.height) * H };
+  }
 
-  // ─── particles ───────────────────────────────────────────────────────────
   const parts = [];
   function burst(x, y, n, opt) {
     const hue = opt.hue == null ? 40 : opt.hue;
@@ -352,435 +337,296 @@ html, body {
       const ang = opt.ang != null ? opt.ang + rand(-0.4, 0.4) : rand(0, TAU);
       const sp = speed * rand(0.3, 1.15);
       parts.push({
-        x, y,
-        vx: Math.cos(ang) * sp,
-        vy: Math.sin(ang) * sp,
-        life, max: life,
-        r: size * rand(0.5, 1.4),
-        hue: hue + rand(-12, 12),
-        sat: opt.sat == null ? 90 : opt.sat,
+        x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+        life, max: life, r: size * rand(0.5, 1.4),
+        hue: hue + rand(-12, 12), sat: opt.sat == null ? 90 : opt.sat,
         light: opt.light == null ? 62 : opt.light,
-        drag: opt.drag == null ? 0.92 : opt.drag,
-        g: opt.g || 0,
-        into,
-        streak: !!opt.streak,
+        drag: opt.drag == null ? 0.92 : opt.drag, g: opt.g || 0, into,
+        streak: !!opt.streak, ember: !!opt.ember, smoke: !!opt.smoke,
       });
     }
   }
-
   function updateParts(dt) {
     for (let i = parts.length - 1; i >= 0; i--) {
       const p = parts[i];
       p.life -= dt;
-      if (p.into) {
-        const dx = p.into.x - p.x, dy = p.into.y - p.y;
-        p.vx += dx * 6 * dt;
-        p.vy += dy * 6 * dt;
-      }
+      if (p.into) { p.vx += (p.into.x - p.x) * 6 * dt; p.vy += (p.into.y - p.y) * 6 * dt; }
       p.vx *= Math.pow(p.drag, dt * 60);
       p.vy *= Math.pow(p.drag, dt * 60);
       p.vy += p.g * dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
       if (p.life <= 0) parts.splice(i, 1);
     }
   }
-
   function drawParts() {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const p of parts) {
       const a = Math.max(0, p.life / p.max);
+      if (p.smoke) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = `rgba(28,22,32,${a * 0.35})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.2 + (1 - a) * 2.2), 0, TAU); ctx.fill();
+        ctx.globalCompositeOperation = "lighter";
+        continue;
+      }
       ctx.fillStyle = hsl(p.hue, p.sat, p.light, a);
       if (p.streak) {
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x - p.vx * 0.04, p.y - p.vy * 0.04);
-        ctx.lineWidth = p.r;
-        ctx.strokeStyle = hsl(p.hue, p.sat, p.light, a * 0.8);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * 0.045, p.y - p.vy * 0.045);
+        ctx.lineWidth = p.r; ctx.strokeStyle = hsl(p.hue, p.sat, p.light, a * 0.85); ctx.stroke();
       }
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * (0.6 + a * 0.6), 0, TAU);
+      if (p.ember) ctx.ellipse(p.x, p.y, p.r * 0.45, p.r * (0.9 + a * 0.8), 0, 0, TAU);
+      else ctx.arc(p.x, p.y, p.r * (0.6 + a * 0.6), 0, TAU);
       ctx.fill();
     }
     ctx.restore();
   }
 
-  // ─── floating texts ──────────────────────────────────────────────────────
   const floats = [];
   function floatText(x, y, text, opt) {
-    floats.push({
-      x, y, text,
-      life: opt.life || 0.9,
-      max: opt.life || 0.9,
-      hue: opt.hue || 42,
-      size: opt.size || 16,
-      vy: opt.vy == null ? -48 : opt.vy,
-    });
+    floats.push({ x, y, text, life: opt.life || 0.9, max: opt.life || 0.9, hue: opt.hue || 42, size: opt.size || 16, vy: opt.vy == null ? -48 : opt.vy });
   }
   function updateFloats(dt) {
     for (let i = floats.length - 1; i >= 0; i--) {
-      const f = floats[i];
-      f.life -= dt;
-      f.y += f.vy * dt;
-      f.vy *= 0.96;
+      const f = floats[i]; f.life -= dt; f.y += f.vy * dt; f.vy *= 0.96;
       if (f.life <= 0) floats.splice(i, 1);
     }
   }
   function drawFloats() {
     for (const f of floats) {
       const a = clamp(f.life / f.max, 0, 1);
-      ctx.save();
-      ctx.globalAlpha = a;
-      ctx.fillStyle = hsl(f.hue, 80, 72);
+      ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = hsl(f.hue, 80, 72);
       ctx.font = `600 ${f.size}px Palatino Linotype, Georgia, serif`;
-      ctx.textAlign = "center";
-      ctx.shadowColor = hsl(f.hue, 90, 50, 0.6);
-      ctx.shadowBlur = 12;
-      ctx.fillText(f.text, f.x, f.y);
-      ctx.restore();
+      ctx.textAlign = "center"; ctx.shadowColor = hsl(f.hue, 90, 50, 0.6); ctx.shadowBlur = 12;
+      ctx.fillText(f.text, f.x, f.y); ctx.restore();
     }
   }
 
-  // ─── stars / world backdrop ──────────────────────────────────────────────
   const stars = [];
   function seedStars() {
     stars.length = 0;
-    for (let i = 0; i < 90; i++) {
-      stars.push({
-        x: Math.random(),
-        y: Math.random(),
-        r: rand(0.4, 1.6),
-        tw: rand(0, TAU),
-        sp: rand(0.4, 1.8),
-        a: rand(0.25, 0.9),
-        layer: Math.random() < 0.35 ? 0 : 1,
-      });
+    for (let i = 0; i < 140; i++) {
+      stars.push({ x: Math.random(), y: Math.random(), r: rand(0.35, 1.85), tw: rand(0, TAU), sp: rand(0.35, 1.9), a: rand(0.22, 0.95), layer: Math.random() < 0.4 ? 0 : 1, cross: Math.random() < 0.08 });
     }
   }
   seedStars();
-
   function noise1(x) {
     const s = Math.sin(x * 1.7) * 12.9898 + Math.cos(x * 0.83) * 78.233;
     return s - Math.floor(s);
   }
   function fbm(x) {
-    return noise1(x) * 0.5 + noise1(x * 2.1) * 0.28 + noise1(x * 4.3) * 0.15;
+    return noise1(x) * 0.5 + noise1(x * 2.1) * 0.28 + noise1(x * 4.3) * 0.15 + noise1(x * 8.1) * 0.07;
   }
 
-  // ─── game state ──────────────────────────────────────────────────────────
   const STATE = { TITLE: "title", FLY: "fly", LAND: "land", ROOST: "roost" };
-  let state = STATE.TITLE;
-  let time = 0;
-  let titleT = 0;
-
+  let state = STATE.TITLE, time = 0, titleT = 0;
   const run = {
-    t: 0,
-    dur: 60,
-    nectar: 0,
-    combo: 0,
-    comboT: 0,
-    bestCombo: 0,
-    kindledT: 0,
-    catches: 0,
-    nearMisses: 0,
-    blessing: null,
-    echoT: -99,
-    echoArmed: false,
-    alcoveGot: false,
-    teachTap: true,
-    teachHold: true,
+    t: 0, dur: 60, nectar: 0, combo: 0, comboT: 0, bestCombo: 0, kindledT: 0,
+    catches: 0, nearMisses: 0, blessing: null, echoT: -99, echoArmed: false,
+    alcoveGot: false, teachTap: true, teachHold: true,
+    wick: WICK_MAX, invuln: 0, crashed: false, shake: 0, hitFlash: 0, skimT: 0,
   };
+  const lantern = { x: 0.5, y: 0.70, vx: 0, bank: 0, bankVis: 0, bankV: 0, roll: 0, pulseT: 99, pulseCd: 0, glow: 1, trail: [], flame: 1 };
+  const moths = [], threats = [], speedLines = [], pulseRings = [];
+  let spawnAcc = 0, threatAcc = 0, worldZ = 0, fogT = 0;
+  let comboPop = 0, comboPopN = 0, landT = 0, roostT = 0;
+  let cards = [], picked = -1, hoverCard = -1, titlePulse = 0, lastCatchName = "", lastCatchT = 0;
 
-  const lantern = {
-    x: 0.5,
-    y: 0.70,
-    vx: 0,
-    bank: 0,       // -1..1 target
-    bankVis: 0,
-    roll: 0,
-    pulseT: 99,
-    pulseCd: 0,
-    glow: 1,
-    trail: [],
-  };
-
-  const moths = [];
-  const speedLines = [];
-  let spawnAcc = 0;
-  let worldZ = 0;
-  let fogT = 0;
-  const pulseRings = [];
-  let comboPop = 0;
-  let comboPopN = 0;
-  let landT = 0;
-  let roostT = 0;
-  let cards = [];
-  let picked = -1;
-  let hoverCard = -1;
-  let titlePulse = 0;
-  let lastCatchName = "";
-  let lastCatchT = 0;
-
+  function heat() { return clamp(run.t / Math.max(8, run.dur * 0.92), 0, 1); }
+  function magScale() { return lerp(1.12, 0.68, smoothstep(heat())); }
   function pulseRadiusPx() {
     const u = Math.min(W, H);
-    let r = 0.168 * u; // ~2.4u feel
-    r *= 1 + save.pulseChip * 0.02;
+    let r = 0.168 * u * (1 + save.pulseChip * 0.02);
     if (run.blessing === "deep") r *= 1.35;
     if (run.kindledT > 0) r *= 1.18;
-    return r;
+    return r * magScale();
   }
-  function pulseCdMax() {
-    return Math.max(0.40, 0.55 - save.cdChip * 0.02);
-  }
-  function lanternPx() {
-    const maxOff = W * 0.32;
-    return {
-      x: W * 0.5 + lantern.bankVis * maxOff,
-      y: H * lantern.y,
-    };
-  }
+  function pulseCdMax() { return Math.max(0.40, 0.55 - save.cdChip * 0.02); }
+  function maxBankOff() { return W * 0.34; }
+  function lanternPx() { return { x: W * 0.5 + clamp(lantern.bankVis, -1, 1) * maxBankOff(), y: H * lantern.y }; }
+  function xToBank(px) { return clamp((px - W * 0.5) / maxBankOff(), -1, 1); }
+  function fibStep(combo) { return combo <= 0 ? 0 : FIB[Math.min(FIB.length - 1, combo - 1)]; }
 
   function resetRun() {
-    run.t = 0;
-    run.dur = rand(52, 68);
-    run.nectar = 0;
-    run.combo = 0;
-    run.comboT = 0;
-    run.bestCombo = 0;
-    run.kindledT = 0;
-    run.catches = 0;
-    run.nearMisses = 0;
-    run.echoT = -99;
-    run.echoArmed = run.blessing === "twin";
-    run.alcoveGot = false;
-    run.teachTap = save.flights < 2;
-    run.teachHold = save.flights < 2;
-    moths.length = 0;
-    pulseRings.length = 0;
-    lantern.x = 0.5;
-    lantern.bank = 0;
-    lantern.bankVis = 0;
-    lantern.roll = 0;
-    lantern.pulseT = 99;
-    lantern.pulseCd = 0;
-    lantern.trail = [];
-    spawnAcc = 0.2;
-    worldZ = 0;
-    comboPop = 0;
-    lastCatchName = "";
-    // opening moths for teach
+    run.t = 0; run.dur = rand(48, 86); run.nectar = 0; run.combo = 0; run.comboT = 0;
+    run.bestCombo = 0; run.kindledT = 0; run.catches = 0; run.nearMisses = 0;
+    run.echoT = -99; run.echoArmed = run.blessing === "twin"; run.alcoveGot = false;
+    run.teachTap = save.flights < 2; run.teachHold = save.flights < 2;
+    run.wick = WICK_MAX; run.invuln = 0; run.crashed = false; run.shake = 0; run.hitFlash = 0; run.skimT = 0;
+    moths.length = 0; threats.length = 0; pulseRings.length = 0;
+    lantern.bank = 0; lantern.bankVis = 0; lantern.bankV = 0; lantern.roll = 0;
+    lantern.pulseT = 99; lantern.pulseCd = 0; lantern.glow = 1; lantern.flame = 1; lantern.trail = [];
+    spawnAcc = 0.2; threatAcc = 4.5; worldZ = 0; comboPop = 0; lastCatchName = "";
     const lp = lanternPx();
-    const t1 = spawnMoth(MOTHS.wickling, lp.x + rand(-24, 24), H * 0.52, 0);
-    t1.life = 3.4;
-    const t2 = spawnMoth(MOTHS.wickling, lp.x + 56, H * 0.40, 0.2);
-    t2.life = 3.2;
-    spawnMoth(MOTHS.glasswing, lp.x - 70, H * 0.22, 0.8);
+    const t1 = spawnMoth(MOTHS.wickling, lp.x + rand(-24, 24), H * 0.52, 0); t1.life = 3.6;
+    const t2 = spawnMoth(MOTHS.wickling, lp.x + 56, H * 0.40, 0.2); t2.life = 3.4;
+    spawnMoth(MOTHS.wickling, lp.x - 48, H * 0.28, 0.45);
   }
 
   function spawnMoth(def, x, y, delay) {
+    const h = heat();
     const m = {
-      def,
-      x, y,
-      vx: rand(-12, 12),
-      vy: def.speed * rand(0.75, 1.15),
-      age: -(delay || 0),
-      life: 2.4,
-      fade: 0.8,
-      phase: rand(0, TAU),
-      magnet: false,
-      magSp: 0,
-      rot: rand(0, TAU),
-      caught: false,
-      stretch: 1,
-      alive: true,
-      cue: false,
+      def, x, y, vx: rand(-12, 12), vy: def.speed * lerp(0.82, 1.28, h) * rand(0.78, 1.16),
+      age: -(delay || 0), life: lerp(2.7, 1.85, h), fade: 0.75, phase: rand(0, TAU),
+      magnet: false, magSp: 0, rot: rand(0, TAU), caught: false, stretch: 1, alive: true, cue: false,
+      magMul: (def.mag || 1) * magScale(),
     };
-    moths.push(m);
-    return m;
+    moths.push(m); return m;
   }
 
   function spawnWeighted(x, y) {
-    const t = run.t / run.dur;
-    let pool = MOTH_LIST.map((d) => {
+    const t = heat();
+    const pool = MOTH_LIST.map((d) => {
       let w = d.spawnW;
-      if (d.id === "vault" && t < 0.35) w *= 0.2;
-      if (d.id === "choir" && t < 0.15) w *= 0.4;
+      if (d.id === "wickling") w *= lerp(1.55, 0.45, t);
+      if (d.id === "spark") w *= lerp(0.7, 1.15, t);
+      if (d.id === "skipper") w *= lerp(0.25, 1.55, t);
+      if (d.id === "glasswing") w *= lerp(0.08, 1.7, t);
+      if (d.id === "vault") w *= t < 0.32 ? 0.12 : lerp(0.4, 1.2, t);
+      if (d.id === "choir") w *= t < 0.12 ? 0.25 : lerp(0.6, 1.25, t);
       return { d, w };
     });
-    let sum = 0;
-    for (const p of pool) sum += p.w;
-    let r = Math.random() * sum;
-    let def = MOTHS.wickling;
-    for (const p of pool) {
-      r -= p.w;
-      if (r <= 0) { def = p.d; break; }
-    }
+    let sum = 0; for (const p of pool) sum += p.w;
+    let r = Math.random() * sum, def = MOTHS.wickling;
+    for (const p of pool) { r -= p.w; if (r <= 0) { def = p.d; break; } }
     if (def.trio) {
-      const cx = x, cy = y;
-      spawnMoth(def, cx, cy, 0);
-      spawnMoth(def, cx - 28, cy - 22, 0.05);
-      spawnMoth(def, cx + 28, cy - 18, 0.1);
-    } else {
-      spawnMoth(def, x, y, 0);
-    }
+      spawnMoth(def, x, y, 0); spawnMoth(def, x - 28, y - 22, 0.05); spawnMoth(def, x + 28, y - 18, 0.1);
+    } else if (t > 0.62 && Math.random() < 0.28 + t * 0.25) {
+      const n = 2 + ((Math.random() * 3) | 0);
+      for (let i = 0; i < n; i++) spawnMoth(def, x + rand(-46, 46), y - i * 22, i * 0.04);
+    } else spawnMoth(def, x, y, 0);
   }
 
-  function fibStep(combo) {
-    if (combo <= 0) return 0;
-    return FIB[Math.min(FIB.length - 1, combo - 1)];
+  function spawnThreat() {
+    const h = heat();
+    const kind = Math.random() > 0.32 + h * 0.28 ? "cinder" : "ashbat";
+    threats.push({
+      kind, x: W * 0.5 + rand(-W * 0.32, W * 0.32), y: rand(-40, H * 0.12),
+      vx: rand(-40, 40),
+      vy: (kind === "cinder" ? rand(165, 230) : rand(140, 195)) * lerp(0.85, 1.25, h),
+      r: kind === "cinder" ? rand(8, 11) : rand(15, 19),
+      phase: rand(0, TAU), age: 0, alive: true, skimmed: false, flap: rand(0, TAU), burned: false,
+    });
   }
 
   function doPulse(isEcho) {
-    if (!isEcho) {
-      if (lantern.pulseCd > 0) return;
-      lantern.pulseCd = pulseCdMax();
-    }
-    lantern.pulseT = 0;
-    lantern.glow = 1.8;
-    const lp = lanternPx();
-    const R = pulseRadiusPx();
+    if (!isEcho) { if (lantern.pulseCd > 0) return; lantern.pulseCd = pulseCdMax(); }
+    lantern.pulseT = 0; lantern.glow = 1.8;
+    const lp = lanternPx(), R = pulseRadiusPx();
     pulseRings.push({ x: lp.x, y: lp.y, r: 8, max: R * 1.15, life: 0.35, a: 1 });
-    SFX.pulse();
-    vibe(isEcho ? 8 : 14);
-    burst(lp.x, lp.y, 18, { hue: 38, speed: 140, life: 0.35, size: 2.2, streak: true });
-
-    if (run.blessing === "twin" && !isEcho) {
-      run.echoT = 0.4;
-    }
-
+    SFX.pulse(); vibe(isEcho ? 8 : 14);
+    burst(lp.x, lp.y, 22, { hue: 38, speed: 150, life: 0.38, size: 2.3, streak: true, ember: true });
+    if (run.blessing === "twin" && !isEcho) run.echoT = 0.4;
     for (const m of moths) {
       if (!m.alive || m.age < 0) continue;
-      const dx = m.x - lp.x, dy = m.y - lp.y;
-      const dist = Math.hypot(dx, dy);
-      const fading = m.age > m.life;
-      if (dist < R + m.def.r) {
-        m.magnet = true;
-        m.magSp = 220 + (R - dist) * 2;
-      }
+      const dist = Math.hypot(m.x - lp.x, m.y - lp.y);
+      if (dist < R * m.magMul + m.def.r) { m.magnet = true; m.magSp = 220 + (R - dist) * 2; }
     }
+    for (const th of threats) {
+      if (!th.alive || th.burned) continue;
+      const dist = Math.hypot(th.x - lp.x, th.y - lp.y);
+      const burnR = th.kind === "cinder" ? R * 0.92 : R * 0.52;
+      if (dist < burnR + th.r * 0.4) burnThreat(th);
+    }
+  }
+
+  function burnThreat(th) {
+    th.alive = false; th.burned = true; SFX.burn(); vibe(12);
+    burst(th.x, th.y, 18, { hue: th.kind === "cinder" ? 18 : 12, speed: 130, life: 0.45, size: 2.4, streak: true, ember: true, sat: 70, light: 55 });
+    burst(th.x, th.y, 8, { smoke: true, hue: 20, speed: 40, life: 0.7, size: 6, drag: 0.94, sat: 10, light: 20 });
+    floatText(th.x, th.y - 10, th.kind === "cinder" ? "burn" : "clip", { hue: 28, size: 13, life: 0.55 });
+    run.nectar += th.kind === "cinder" ? 2 : 4;
+  }
+
+  function hitThreat(th) {
+    if (run.invuln > 0) return;
+    th.alive = false;
+    run.wick = Math.max(0, run.wick - 1);
+    run.invuln = 0.9; run.shake = 1; run.hitFlash = 1;
+    lantern.glow = 0.35; lantern.flame = 0.25 + run.wick * 0.22;
+    const lost = Math.min(run.nectar, 8 + ((Math.random() * 8) | 0));
+    run.nectar -= lost; run.combo = 0; run.comboT = 0;
+    SFX.hit(); vibe([18, 30, 40]);
+    const lp = lanternPx();
+    burst(th.x, th.y, 22, { hue: 8, speed: 160, life: 0.5, size: 2.6, sat: 40, light: 40 });
+    burst(lp.x, lp.y, 10, { smoke: true, hue: 20, speed: 50, life: 0.9, size: 8, drag: 0.95 });
+    if (lost > 0) floatText(lp.x, lp.y - 40, `-${lost}`, { hue: 8, size: 16, life: 0.8 });
+    floatText(lp.x, lp.y - 18, "wick", { hue: 18, size: 13, life: 0.7 });
+    if (run.wick <= 0) { run.crashed = true; beginLand(); }
+  }
+
+  function skimThreat(th) {
+    if (th.skimmed) return;
+    th.skimmed = true; run.nearMisses++; run.skimT = 0.35; run.nectar += 3;
+    SFX.nearMiss(); vibe(6);
+    burst(th.x, th.y, 10, { hue: 200, speed: 90, life: 0.35, size: 1.8, streak: true, sat: 50, light: 70 });
+    floatText(th.x, th.y, "skim +3", { hue: 195, size: 12, life: 0.5 });
   }
 
   function catchMoth(m) {
     if (!m.alive) return;
-    m.alive = false;
-    m.caught = true;
-    const fading = m.age > m.life;
-    const lp = lanternPx();
-    const comboAlive = run.comboT > 0 && run.combo > 0;
-    run.combo = comboAlive ? run.combo + 1 : 1;
-    run.comboT = 1.15;
-    run.bestCombo = Math.max(run.bestCombo, run.combo);
-    comboPop = 1;
-    comboPopN = fibStep(run.combo);
+    m.alive = false; m.caught = true;
+    const fading = m.age > m.life, lp = lanternPx();
+    run.combo = (run.comboT > 0 && run.combo > 0) ? run.combo + 1 : 1;
+    run.comboT = 1.15; run.bestCombo = Math.max(run.bestCombo, run.combo);
+    comboPop = 1; comboPopN = fibStep(run.combo);
     if (run.combo >= 8) run.kindledT = 3;
-
     let n = m.def.nectar;
     if (fading) n = Math.max(1, Math.round(n * 0.5));
     n += Math.min(12, fibStep(run.combo));
     if (m.def.rarity === "common") n += save.nectChip;
     if (run.blessing === "beacon") n = Math.round(n * 1.25);
-    run.nectar += n;
-    run.catches++;
+    run.nectar += n; run.catches++;
     lantern.glow = Math.min(3, lantern.glow + 0.45);
-
-    lastCatchName = m.def.name;
-    lastCatchT = 0.9;
-
+    lantern.flame = Math.min(1.4, lantern.flame + 0.08);
+    lastCatchName = m.def.name; lastCatchT = 0.9;
     SFX.catchSpark(Math.min(run.combo, 10));
     if (run.combo >= 2) SFX.comboStinger(run.combo);
     vibe(run.combo >= 5 ? [6, 20, 10] : 10);
-
     const ang = Math.atan2(lp.y - m.y, lp.x - m.x);
-    burst(m.x, m.y, 16, {
-      hue: m.def.hue, speed: 160, life: 0.45, size: 2.6, streak: true, ang,
-    });
-    burst(lp.x, lp.y, 10, {
-      hue: m.def.hue, speed: 70, life: 0.4, size: 2, sat: m.def.sat, light: 70,
-    });
-    floatText(lp.x + rand(-20, 20), lp.y - 36, `+${n}`, {
-      hue: m.def.hue, size: 15 + Math.min(8, run.combo),
-    });
-    if (run.combo >= 1) {
-      floatText(lp.x, lp.y - 58, String(comboPopN), {
-        hue: 42, size: 22 + Math.min(run.combo, 10), life: 0.7,
-      });
-    }
+    burst(m.x, m.y, 18, { hue: m.def.hue, speed: 170, life: 0.48, size: 2.7, streak: true, ang, ember: true });
+    burst(lp.x, lp.y, 10, { hue: m.def.hue, speed: 70, life: 0.4, size: 2, sat: m.def.sat, light: 70 });
+    floatText(lp.x + rand(-20, 20), lp.y - 36, `+${n}`, { hue: m.def.hue, size: 15 + Math.min(8, run.combo) });
+    floatText(lp.x, lp.y - 58, String(comboPopN), { hue: 42, size: 22 + Math.min(run.combo, 10), life: 0.7 });
   }
 
   function dissolveMoth(m) {
     m.alive = false;
     const lp = lanternPx();
     const dist = Math.hypot(m.x - lp.x, m.y - lp.y);
-    const edge = pulseRadiusPx() + m.def.r + 18;
-    burst(m.x, m.y, 8, {
-      hue: m.def.hue, speed: 40, life: 0.5, size: 1.6, sat: 40, light: 50,
-    });
+    const edge = pulseRadiusPx() * (m.magMul || 1) + m.def.r + 18;
+    burst(m.x, m.y, 8, { hue: m.def.hue, speed: 40, life: 0.5, size: 1.6, sat: 40, light: 50 });
     if (dist < edge) {
-      run.nearMisses++;
-      run.nectar += 2;
-      SFX.nearMiss();
+      run.nearMisses++; run.nectar += 2; SFX.nearMiss();
       floatText(m.x, m.y, "+2", { hue: 200, size: 12, life: 0.55 });
     }
   }
 
-  // ─── input ───────────────────────────────────────────────────────────────
-  const input = {
-    pointers: new Map(),
-    keys: Object.create(null),
-    holdLeft: false,
-    holdRight: false,
-    downAt: 0,
-    downX: 0,
-    downY: 0,
-    pulsedThis: false,
-  };
-
-  function sideFromX(x) {
-    const rect = canvas.getBoundingClientRect();
-    const lx = x - rect.left;
-    return lx < rect.width * 0.5 ? "L" : "R";
-  }
-
-  function recomputeHold() {
-    input.holdLeft = !!input.keys["KeyA"] || !!input.keys["ArrowLeft"];
-    input.holdRight = !!input.keys["KeyD"] || !!input.keys["ArrowRight"];
-    for (const p of input.pointers.values()) {
-      if (p.holding) {
-        if (p.side === "L") input.holdLeft = true;
-        else input.holdRight = true;
-      }
-    }
-  }
+  const input = { pointers: new Map(), keys: Object.create(null), flickV: 0 };
 
   function onPointerDown(e) {
-    e.preventDefault();
-    SFX.resume();
-    const id = e.pointerId;
-    const side = sideFromX(e.clientX);
-    input.pointers.set(id, {
-      side, t: performance.now(), x: e.clientX, y: e.clientY, holding: false,
+    e.preventDefault(); SFX.resume();
+    const loc = toLocal(e.clientX, e.clientY);
+    input.pointers.set(e.pointerId, {
+      t: performance.now(), x: loc.x, y: loc.y, startX: loc.x, startY: loc.y,
+      maxMove: 0, dragging: false, lastX: loc.x, lastT: performance.now(), vx: 0,
     });
-    input.downAt = performance.now();
-    input.downX = e.clientX;
-    input.downY = e.clientY;
-    input.pulsedThis = false;
-    if (state === STATE.TITLE) {
-      startFlight();
-      return;
-    }
-    if (state === STATE.ROOST) {
-      handleRoostPointer(e, true);
-      return;
-    }
+    if (state === STATE.TITLE) { startFlight(); return; }
+    if (state === STATE.ROOST) { handleRoostPointer(e, true); return; }
   }
   function onPointerMove(e) {
     const p = input.pointers.get(e.pointerId);
+    const loc = toLocal(e.clientX, e.clientY);
     if (p) {
-      p.x = e.clientX;
-      p.y = e.clientY;
-      p.side = sideFromX(e.clientX);
+      const now = performance.now();
+      const dtm = Math.max(1, now - p.lastT) / 1000;
+      p.vx = (loc.x - p.lastX) / dtm;
+      p.lastX = loc.x; p.lastT = now; p.x = loc.x; p.y = loc.y;
+      const move = Math.hypot(loc.x - p.startX, loc.y - p.startY);
+      p.maxMove = Math.max(p.maxMove, move);
+      if (Math.abs(loc.x - p.startX) > MOVE_PX || move > MOVE_PX * 1.25) p.dragging = true;
     }
     if (state === STATE.ROOST) handleRoostPointer(e, false);
   }
@@ -788,11 +634,10 @@ html, body {
     e.preventDefault();
     const p = input.pointers.get(e.pointerId);
     const heldMs = p ? performance.now() - p.t : 999;
+    if (p && p.dragging) lantern.bankV = clamp(p.vx / maxBankOff(), -18, 18) * 0.55;
+    const wasTap = p && heldMs < TAP_MS && p.maxMove < MOVE_PX && !p.dragging;
     input.pointers.delete(e.pointerId);
-    recomputeHold();
-    if (state === STATE.FLY && p && heldMs < 180 && !p.holding) {
-      doPulse(false);
-    }
+    if (state === STATE.FLY && wasTap) doPulse(false);
     if (state === STATE.ROOST) handleRoostPointer(e, true, true);
   }
 
@@ -805,8 +650,7 @@ html, body {
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
   window.addEventListener("keydown", (e) => {
-    SFX.resume();
-    input.keys[e.code] = true;
+    SFX.resume(); input.keys[e.code] = true;
     if (e.code === "Space" || e.code === "KeyW" || e.code === "ArrowUp") {
       e.preventDefault();
       if (state === STATE.TITLE) startFlight();
@@ -814,242 +658,180 @@ html, body {
     }
     if (e.code === "Enter" && (state === STATE.TITLE || state === STATE.ROOST)) startFlight();
     if ((e.code === "Space" || e.code === "Enter") && state === STATE.ROOST && picked >= 0) startFlight();
-    recomputeHold();
   });
-  window.addEventListener("keyup", (e) => {
-    input.keys[e.code] = false;
-    recomputeHold();
-  });
+  window.addEventListener("keyup", (e) => { input.keys[e.code] = false; });
 
   function handleRoostPointer(e, click, up) {
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * W;
-    const y = ((e.clientY - rect.top) / rect.height) * H;
+    const loc = toLocal(e.clientX, e.clientY);
+    const x = loc.x, y = loc.y;
     hoverCard = -1;
-    cards.forEach((c, i) => {
-      if (x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h) hoverCard = i;
-    });
-    if (click && !up && hoverCard >= 0 && picked < 0 && roostT > 0.6) {
-      pickBlessing(hoverCard);
-    }
-    if (click && !up && picked >= 0 && roostT > 0.5) {
-      const by = H * 0.88;
-      if (Math.hypot(x - W / 2, y - by) < 80) startFlight();
-    }
+    cards.forEach((c, i) => { if (x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h) hoverCard = i; });
+    if (click && !up && hoverCard >= 0 && picked < 0 && roostT > 0.6) pickBlessing(hoverCard);
+    if (click && !up && picked >= 0 && roostT > 0.5 && Math.hypot(x - W / 2, y - H * 0.88) < 80) startFlight();
   }
 
   function startFlight() {
     if (state === STATE.ROOST && picked < 0 && roostT > 0.4) return;
-    state = STATE.FLY;
-    resetRun();
-    SFX.resume();
-    SFX.ui();
+    state = STATE.FLY; resetRun(); SFX.resume(); SFX.ui();
   }
-
   function pickBlessing(i) {
-    picked = i;
-    const b = cards[i].id;
-    run.blessing = b;
+    picked = i; const b = cards[i].id; run.blessing = b;
     if (b === "deep") save.pulseChip = Math.min(10, save.pulseChip + 1);
     if (b === "twin") save.cdChip = Math.min(8, save.cdChip + 1);
     if (b === "beacon") save.nectChip = Math.min(8, save.nectChip + 1);
-    persist();
-    SFX.ui();
-    SFX.relic();
-    vibe(18);
+    persist(); SFX.ui(); SFX.relic(); vibe(18);
   }
-
   function beginLand() {
-    state = STATE.LAND;
-    landT = 0;
-    save.flights++;
-    save.nectar += run.nectar;
+    if (state === STATE.LAND || state === STATE.ROOST) return;
+    state = STATE.LAND; landT = 0;
+    save.flights++; save.nectar += run.nectar;
     save.bestCombo = Math.max(save.bestCombo || 0, run.bestCombo);
     save.roost = 1 + Math.min(7, Math.floor(save.flights / 2));
-    save.seenTeach = true;
-    persist();
-    SFX.land();
-    vibe([20, 40, 20]);
+    save.seenTeach = true; persist();
+    if (run.crashed) SFX.crashLand(); else SFX.land();
+    vibe(run.crashed ? [30, 40, 50] : [20, 40, 20]);
   }
-
   function beginRoost() {
-    state = STATE.ROOST;
-    roostT = 0;
-    picked = -1;
-    hoverCard = -1;
+    state = STATE.ROOST; roostT = 0; picked = -1; hoverCard = -1;
     const shuffled = BLESSINGS.slice().sort(() => Math.random() - 0.5);
-    const cw = W * 0.28;
-    const gap = W * 0.04;
-    const total = cw * 3 + gap * 2;
-    const x0 = (W - total) / 2;
-    cards = shuffled.map((b, i) => ({
-      ...b,
-      x: x0 + i * (cw + gap),
-      y: H * 0.58,
-      w: cw,
-      h: H * 0.22,
-    }));
+    const cw = W * 0.28, gap = W * 0.04, total = cw * 3 + gap * 2, x0 = (W - total) / 2;
+    cards = shuffled.map((b, i) => ({ ...b, x: x0 + i * (cw + gap), y: H * 0.58, w: cw, h: H * 0.22 }));
   }
 
-  // ─── update ──────────────────────────────────────────────────────────────
+  function steering(dt) {
+    let dragging = false, followX = lanternPx().x, liveV = 0;
+    for (const p of input.pointers.values()) {
+      if (p.dragging || p.maxMove > MOVE_PX || performance.now() - p.t > TAP_MS) {
+        dragging = true; followX = p.x; liveV = p.vx; p.dragging = true;
+      }
+    }
+    const keyL = !!input.keys["KeyA"] || !!input.keys["ArrowLeft"];
+    const keyR = !!input.keys["KeyD"] || !!input.keys["ArrowRight"];
+    if (dragging) {
+      const goal = clamp(xToBank(followX) + clamp(liveV / maxBankOff() * 0.06, -0.22, 0.22), -1, 1);
+      lantern.bank = lerp(lantern.bank, goal, 1 - Math.pow(0.00005, dt));
+      lantern.bankV = liveV / maxBankOff();
+    } else {
+      let keyTarget = null;
+      if (keyL && !keyR) keyTarget = -1;
+      else if (keyR && !keyL) keyTarget = 1;
+      if (keyTarget != null) {
+        lantern.bank = lerp(lantern.bank, keyTarget, 1 - Math.pow(0.012, dt));
+        lantern.bankV = lerp(lantern.bankV, keyTarget * 2.4, 1 - Math.pow(0.05, dt));
+      } else {
+        lantern.bank += lantern.bankV * dt;
+        lantern.bankV *= Math.pow(0.045, dt);
+        if (Math.abs(lantern.bankV) < 0.04) lantern.bankV = 0;
+      }
+    }
+    lantern.bank = clamp(lantern.bank, -1, 1);
+    lantern.bankVis = lerp(lantern.bankVis, lantern.bank, 1 - Math.pow(0.0008, dt));
+    lantern.roll = lerp(lantern.roll, lantern.bankVis * 0.2 + lantern.bankV * 0.03, 1 - Math.pow(0.04, dt));
+  }
+
   function updateTitle(dt) {
-    titleT += dt;
-    titlePulse += dt;
+    titleT += dt; titlePulse += dt;
     lantern.bankVis = Math.sin(titleT * 0.7) * 0.15;
-    lantern.glow = 1.1 + Math.sin(titleT * 2.2) * 0.15;
-    if (Math.random() < dt * 1.4) {
+    lantern.glow = 1.1 + Math.sin(titleT * 2.2) * 0.15; lantern.flame = 1;
+    if (Math.random() < dt * 1.6) {
       const lp = lanternPx();
-      burst(lp.x + rand(-8, 8), lp.y - 10, 1, {
-        hue: 38, speed: 20, life: 1.2, size: 1.6, g: -30, drag: 0.98,
-      });
+      burst(lp.x + rand(-6, 6), lp.y - 14, 1, { hue: 38, speed: 18, life: 1.3, size: 1.7, g: -34, drag: 0.98, ember: true });
     }
   }
 
   function updateFly(dt) {
-    run.t += dt;
-    worldZ += dt * 11;
-    fogT += dt;
-
-    // hold bank
-    recomputeHold();
-    // promote long-press pointers to hold
-    const now = performance.now();
-    for (const p of input.pointers.values()) {
-      if (!p.holding && now - p.t > 150) p.holding = true;
-    }
-    recomputeHold();
-
-    let target = 0;
-    if (input.holdLeft && !input.holdRight) target = -1;
-    else if (input.holdRight && !input.holdLeft) target = 1;
-    else if (input.holdLeft && input.holdRight) target = 0;
-    lantern.bank = lerp(lantern.bank, target, 1 - Math.pow(0.0008, dt));
-    if (target === 0) lantern.bank = lerp(lantern.bank, 0, 1 - Math.pow(0.004, dt));
-    lantern.bankVis = lerp(lantern.bankVis, lantern.bank, 1 - Math.pow(0.012, dt));
-    lantern.roll = lerp(lantern.roll, lantern.bankVis * 0.22, 1 - Math.pow(0.05, dt));
-
-    lantern.pulseT += dt;
-    lantern.pulseCd = Math.max(0, lantern.pulseCd - dt);
-    lantern.glow = lerp(lantern.glow, 1, 1 - Math.pow(0.08, dt));
+    run.t += dt; worldZ += dt * 11; fogT += dt;
+    run.invuln = Math.max(0, run.invuln - dt);
+    run.shake = Math.max(0, run.shake - dt * 3.2);
+    run.hitFlash = Math.max(0, run.hitFlash - dt * 2.4);
+    run.skimT = Math.max(0, run.skimT - dt);
+    steering(dt);
+    lantern.pulseT += dt; lantern.pulseCd = Math.max(0, lantern.pulseCd - dt);
+    lantern.glow = lerp(lantern.glow, 0.55 + run.wick * 0.18, 1 - Math.pow(0.08, dt));
+    lantern.flame = lerp(lantern.flame, 0.35 + run.wick * 0.22, 1 - Math.pow(0.12, dt));
     run.comboT = Math.max(0, run.comboT - dt);
     if (run.comboT <= 0) run.combo = 0;
     run.kindledT = Math.max(0, run.kindledT - dt);
     comboPop = Math.max(0, comboPop - dt * 2.2);
     lastCatchT = Math.max(0, lastCatchT - dt);
+    if (run.echoT >= 0) { run.echoT -= dt; if (run.echoT <= 0) { run.echoT = -99; doPulse(true); } }
 
-    if (run.echoT >= 0) {
-      run.echoT -= dt;
-      if (run.echoT <= 0) {
-        run.echoT = -99;
-        doPulse(true);
-      }
-    }
-
-    // trail
     const lp = lanternPx();
-    lantern.trail.push({ x: lp.x, y: lp.y, a: 1, r: 10 + lantern.glow * 4 });
-    if (lantern.trail.length > 18) lantern.trail.shift();
+    lantern.trail.push({ x: lp.x, y: lp.y, a: 1, r: 12 + lantern.glow * 5 });
+    if (lantern.trail.length > 22) lantern.trail.shift();
     for (const t of lantern.trail) t.a *= 0.86;
+    if (Math.random() < dt * 22) burst(lp.x + rand(-5, 5), lp.y + 10, 1, { hue: 32, speed: 14, life: 0.75, size: 1.7, g: 42, drag: 0.96, ember: true });
 
-    if (Math.random() < dt * 18) {
-      burst(lp.x + rand(-6, 6), lp.y + 8, 1, {
-        hue: 32, speed: 16, life: 0.7, size: 1.8, g: 40, drag: 0.96,
-      });
-    }
-
-    // spawn moths
-    const density = 1.05 + run.t / run.dur * 0.7 + (run.combo >= 5 ? 0.25 : 0);
-    spawnAcc += dt * density;
-    const interval = 0.62;
+    const h = heat();
+    spawnAcc += dt * (lerp(0.95, 1.85, h) + (run.combo >= 5 ? 0.22 : 0));
+    const interval = lerp(0.72, 0.36, h);
     while (spawnAcc >= interval) {
       spawnAcc -= interval;
-      const nx = W * 0.5 + rand(-W * 0.34, W * 0.34);
-      const ny = rand(-30, H * 0.22);
-      spawnWeighted(nx, ny);
+      spawnWeighted(W * 0.5 + rand(-W * 0.34, W * 0.34), rand(-36, H * 0.2));
     }
-
-    // glasswing audio cue when near
-    for (const m of moths) {
-      if (m.alive && m.def.audio === "glass" && !m.cue && m.age > 0) {
-        const d = Math.hypot(m.x - lp.x, m.y - lp.y);
-        if (d < pulseRadiusPx() * 2.1) {
-          m.cue = true;
-          SFX.glass();
-        }
+    threatAcc += dt * lerp(0.15, 1.35, Math.max(0, (h - 0.08) / 0.92));
+    const tInt = lerp(2.6, 0.85, h);
+    if (run.t > 7) {
+      while (threatAcc >= tInt) {
+        threatAcc -= tInt; spawnThreat();
+        if (h > 0.7 && Math.random() < 0.4) spawnThreat();
       }
     }
 
-    // moths
+    for (const m of moths) {
+      if (m.alive && m.def.audio === "glass" && !m.cue && m.age > 0) {
+        if (Math.hypot(m.x - lp.x, m.y - lp.y) < pulseRadiusPx() * 2.1) { m.cue = true; SFX.glass(); }
+      }
+    }
     for (let i = moths.length - 1; i >= 0; i--) {
       const m = moths[i];
       m.age += dt;
-      if (m.age < 0 || !m.alive) {
-        if (!m.alive) moths.splice(i, 1);
-        continue;
-      }
-      m.phase += dt * m.def.wobble * 6;
-      m.rot += dt * 2;
-
+      if (m.age < 0 || !m.alive) { if (!m.alive) moths.splice(i, 1); continue; }
+      m.phase += dt * m.def.wobble * 6; m.rot += dt * 2;
       if (m.magnet) {
-        const dx = lp.x - m.x, dy = lp.y - m.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        m.magSp += 980 * dt;
-        m.vx = (dx / dist) * m.magSp;
-        m.vy = (dy / dist) * m.magSp;
+        const dx = lp.x - m.x, dy = lp.y - m.y, dist = Math.hypot(dx, dy) || 1;
+        m.magSp += 980 * dt; m.vx = (dx / dist) * m.magSp; m.vy = (dy / dist) * m.magSp;
         m.stretch = 1 + Math.min(2.2, m.magSp / 280);
-        m.x += m.vx * dt;
-        m.y += m.vy * dt;
-        burst(m.x, m.y, 1, {
-          hue: m.def.hue, speed: 30, life: 0.2, size: 1.5, streak: true,
-          ang: Math.atan2(m.vy, m.vx) + Math.PI,
-        });
+        m.x += m.vx * dt; m.y += m.vy * dt;
+        burst(m.x, m.y, 1, { hue: m.def.hue, speed: 30, life: 0.2, size: 1.5, streak: true, ang: Math.atan2(m.vy, m.vx) + Math.PI });
         if (dist < 16 + m.def.r * 0.3) catchMoth(m);
       } else {
         let wx = Math.sin(m.phase) * 28 * m.def.wobble;
-        if (m.def.zigzag) wx = Math.sin(m.phase * 1.8) * 55;
-        m.x += wx * dt * 4;
-        m.y += m.vy * dt;
-        m.x += Math.sin(m.phase * 0.5) * dt * 10;
+        if (m.def.zigzag) wx = Math.sin(m.phase * (1.8 + h)) * (55 + h * 28);
+        m.x += wx * dt * 4; m.y += m.vy * dt; m.x += Math.sin(m.phase * 0.5) * dt * 10;
         m.stretch = lerp(m.stretch, 1, 0.2);
-        const maxAge = m.life + m.fade;
-        if (m.age >= maxAge || m.y > H + 40) dissolveMoth(m);
+        if (m.age >= m.life + m.fade || m.y > H + 40) dissolveMoth(m);
       }
     }
 
-    // alcove relic ~ mid run, bank far right
-    if (!run.alcoveGot && run.t > 22 && run.t < 38) {
-      const ax = W * 0.92, ay = H * 0.42;
-      if (lantern.bankVis > 0.72) {
-        {
-          run.alcoveGot = true;
-          save.relics++;
-          persist();
-          SFX.relic();
-          floatText(lp.x, lp.y - 70, "relic", { hue: 50, size: 18, life: 1.2 });
-          burst(ax, ay, 28, { hue: 48, speed: 120, life: 0.7, size: 2.4 });
-          run.nectar += 12;
-        }
-      }
+    for (let i = threats.length - 1; i >= 0; i--) {
+      const th = threats[i];
+      if (!th.alive) { threats.splice(i, 1); continue; }
+      th.age += dt; th.phase += dt * (th.kind === "ashbat" ? 7 : 5); th.flap += dt * 14;
+      const zig = th.kind === "ashbat" ? Math.sin(th.phase) * 90 : Math.sin(th.phase * 1.6) * 42;
+      th.x += (th.vx + zig) * dt; th.y += th.vy * dt;
+      if (Math.random() < dt * 8) burst(th.x, th.y, 1, { smoke: true, hue: 10, speed: 12, life: 0.5, size: 4, drag: 0.96, g: 8 });
+      const dist = Math.hypot(th.x - lp.x, th.y - lp.y);
+      const hitR = 15 + th.r * 0.55;
+      if (dist < hitR && run.invuln <= 0) hitThreat(th);
+      else if (!th.skimmed && dist < hitR + 16 && dist > hitR) skimThreat(th);
+      if (th.y > H + 50 || th.x < -60 || th.x > W + 60) th.alive = false;
     }
 
-    // speed lines when combo hot
+    if (!run.alcoveGot && run.t > 22 && run.t < 38 && lantern.bankVis > 0.72) {
+      run.alcoveGot = true; save.relics++; persist(); SFX.relic();
+      floatText(lp.x, lp.y - 70, "relic", { hue: 50, size: 18, life: 1.2 });
+      burst(W * 0.92, H * 0.42, 28, { hue: 48, speed: 120, life: 0.7, size: 2.4, ember: true });
+      run.nectar += 12;
+    }
     if (run.combo >= 5 && Math.random() < dt * 24) {
-      speedLines.push({
-        x: rand(0, W),
-        y: rand(0, H * 0.7),
-        len: rand(18, 48) * (run.combo >= 8 ? 1.4 : 1),
-        a: 0.35,
-        v: 420 + run.combo * 20,
-      });
+      speedLines.push({ x: rand(0, W), y: rand(0, H * 0.7), len: rand(18, 48) * (run.combo >= 8 ? 1.4 : 1), a: 0.35, v: 420 + run.combo * 20 });
     }
     for (let i = speedLines.length - 1; i >= 0; i--) {
-      const s = speedLines[i];
-      s.y += s.v * dt;
-      s.a -= dt * 0.8;
+      const s = speedLines[i]; s.y += s.v * dt; s.a -= dt * 0.8;
       if (s.a <= 0 || s.y > H) speedLines.splice(i, 1);
     }
-
-    if (run.t >= run.dur) beginLand();
+    if (run.t >= run.dur && !run.crashed) beginLand();
   }
 
   function updateLand(dt) {
@@ -1057,679 +839,534 @@ html, body {
     lantern.bank = lerp(lantern.bank, 0, dt * 3);
     lantern.bankVis = lerp(lantern.bankVis, 0, dt * 3);
     lantern.roll = lerp(lantern.roll, 0, dt * 3);
-    lantern.glow = lerp(lantern.glow, 1.6, dt * 2);
+    lantern.glow = lerp(lantern.glow, run.crashed ? 0.7 : 1.6, dt * 2);
     if (landT > 1.35) beginRoost();
   }
-
   function updateRoost(dt) {
-    roostT += dt;
-    lantern.glow = 1.2 + Math.sin(roostT * 2) * 0.15;
-    if (Math.random() < dt * 2) {
-      burst(W * 0.5 + rand(-40, 40), H * 0.42, 1, {
-        hue: 38, speed: 12, life: 1.4, size: 1.8, g: -20, drag: 0.98,
-      });
-    }
+    roostT += dt; lantern.glow = 1.2 + Math.sin(roostT * 2) * 0.15;
+    if (Math.random() < dt * 2) burst(W * 0.5 + rand(-40, 40), H * 0.42, 1, { hue: 38, speed: 12, life: 1.4, size: 1.8, g: -20, drag: 0.98, ember: true });
   }
 
-  // ─── draw ────────────────────────────────────────────────────────────────
   function skyGradient() {
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, "#070614");
-    g.addColorStop(0.35, "#120c28");
-    g.addColorStop(0.7, "#1a1233");
-    g.addColorStop(1, "#0c0818");
+    g.addColorStop(0, "#060414"); g.addColorStop(0.22, "#0e0a22");
+    g.addColorStop(0.48, "#16102c"); g.addColorStop(0.78, "#1c1434"); g.addColorStop(1, "#0a0816");
     return g;
   }
-
+  function drawMoon() {
+    const mx = W * 0.72, my = H * 0.16;
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const halo = ctx.createRadialGradient(mx, my, 6, mx, my, 70);
+    halo.addColorStop(0, "rgba(255,236,210,0.22)");
+    halo.addColorStop(0.4, "rgba(180,190,255,0.06)"); halo.addColorStop(1, "rgba(180,190,255,0)");
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx, my, 70, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#d9d4c4"; ctx.beginPath(); ctx.arc(mx, my, 16, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(mx + 6, my - 3, 13, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
   function drawStars(par) {
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
     for (const s of stars) {
       if (s.layer !== par) continue;
       const tw = 0.55 + 0.45 * Math.sin(time * s.sp + s.tw);
       ctx.fillStyle = `rgba(255,236,210,${s.a * tw * (par ? 0.7 : 1)})`;
-      const x = s.x * W;
-      const y = ((s.y * H + worldZ * (par ? 4 : 10)) % (H + 20)) - 10;
-      ctx.beginPath();
-      ctx.arc(x, y, s.r, 0, TAU);
-      ctx.fill();
+      const x = s.x * W, y = ((s.y * H + worldZ * (par ? 4 : 10)) % (H + 20)) - 10;
+      ctx.beginPath(); ctx.arc(x, y, s.r, 0, TAU); ctx.fill();
+      if (s.cross && tw > 0.85) {
+        ctx.strokeStyle = `rgba(255,236,210,${s.a * tw * 0.35})`; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(x - s.r * 3, y); ctx.lineTo(x + s.r * 3, y);
+        ctx.moveTo(x, y - s.r * 3); ctx.lineTo(x, y + s.r * 3); ctx.stroke();
+      }
     }
     ctx.restore();
   }
-
   function cliffPath(layer, scroll, inset) {
-    const left = [];
-    const right = [];
-    const steps = 28;
+    const left = [], right = [], steps = 42;
     for (let i = 0; i <= steps; i++) {
-      const yt = i / steps;
-      const y = yt * (H + 80) - 40;
+      const yt = i / steps, y = yt * (H + 80) - 40;
       const n = fbm(yt * 4 + scroll * 0.04 + layer * 3.1);
       const n2 = fbm(yt * 7 + 10 + scroll * 0.07);
-      const wiggle = (n - 0.5) * W * 0.18 + (n2 - 0.5) * W * 0.06;
-      const base = W * (0.08 + layer * 0.04 + inset);
-      left.push({ x: base + wiggle, y });
-      right.push({ x: W - base - wiggle * 0.9, y });
+      const n3 = fbm(yt * 18 + layer);
+      const wiggle = (n - 0.5) * W * 0.2 + (n2 - 0.5) * W * 0.07 + (n3 - 0.5) * W * 0.025;
+      const ledge = (noise1(yt * 11 + layer * 2 + Math.floor(scroll * 0.2)) > 0.82) ? W * 0.035 : 0;
+      const base = W * (0.075 + layer * 0.038 + inset);
+      left.push({ x: base + wiggle + ledge, y });
+      right.push({ x: W - base - wiggle * 0.9 - ledge * 0.7, y });
     }
     return { left, right };
   }
-
+  function fillCliff(pts, side, col) {
+    ctx.fillStyle = col; ctx.beginPath();
+    if (side === "L") { ctx.moveTo(-24, -40); pts.forEach((p) => ctx.lineTo(p.x, p.y)); ctx.lineTo(-24, H + 40); }
+    else { ctx.moveTo(W + 24, -40); pts.forEach((p) => ctx.lineTo(p.x, p.y)); ctx.lineTo(W + 24, H + 40); }
+    ctx.closePath(); ctx.fill();
+  }
   function drawCliffs() {
+    const lp = lanternPx();
     const layers = [
-      { z: 0.25, col: "#0e0c1c", inset: 0.02, scroll: worldZ * 0.35 },
-      { z: 0.55, col: "#16102a", inset: 0.0, scroll: worldZ * 0.7 },
-      { z: 1, col: "#221834", inset: -0.02, scroll: worldZ },
+      { col: "#0c0a18", rim: "rgba(90,70,120,0.18)", inset: 0.03, scroll: worldZ * 0.28 },
+      { col: "#141022", rim: "rgba(160,100,50,0.12)", inset: 0.0, scroll: worldZ * 0.62 },
+      { col: "#231830", rim: "rgba(255,170,80,0.16)", inset: -0.025, scroll: worldZ },
     ];
     layers.forEach((L, li) => {
       const { left, right } = cliffPath(li, L.scroll, L.inset);
-      ctx.fillStyle = L.col;
-      ctx.beginPath();
-      ctx.moveTo(-20, -40);
-      left.forEach((p) => ctx.lineTo(p.x, p.y));
-      ctx.lineTo(-20, H + 40);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(W + 20, -40);
-      right.forEach((p) => ctx.lineTo(p.x, p.y));
-      ctx.lineTo(W + 20, H + 40);
-      ctx.closePath();
-      ctx.fill();
-
-      // rim glow
+      fillCliff(left, "L", L.col); fillCliff(right, "R", L.col);
       ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = `rgba(255, 170, 90, ${0.04 + li * 0.03})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      left.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.stroke();
-      ctx.beginPath();
-      right.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-24, -40); left.forEach((p) => ctx.lineTo(p.x, p.y)); ctx.lineTo(-24, H + 40); ctx.closePath(); ctx.clip();
+      const glowL = ctx.createRadialGradient(lp.x, lp.y, 10, lp.x, lp.y, W * 0.7);
+      glowL.addColorStop(0, `rgba(255,160,70,${0.05 + li * 0.03})`); glowL.addColorStop(1, "rgba(255,140,50,0)");
+      ctx.fillStyle = glowL; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "rgba(0,0,0,0.18)"; ctx.lineWidth = 1;
+      for (let s = 0; s < 10; s++) {
+        const yy = ((s * H * 0.14 + L.scroll * 7) % (H + 40)) - 20;
+        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W * 0.28, yy + 8); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(W + 24, -40); right.forEach((p) => ctx.lineTo(p.x, p.y)); ctx.lineTo(W + 24, H + 40); ctx.closePath(); ctx.clip();
+      const glowR = ctx.createRadialGradient(lp.x, lp.y, 10, lp.x, lp.y, W * 0.7);
+      glowR.addColorStop(0, `rgba(255,160,70,${0.05 + li * 0.03})`); glowR.addColorStop(1, "rgba(255,140,50,0)");
+      ctx.fillStyle = glowR; ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = L.rim; ctx.lineWidth = 2.2;
+      ctx.beginPath(); left.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
+      ctx.beginPath(); right.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
       ctx.restore();
     });
   }
-
   function drawRibbon() {
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const pts = [];
-    for (let i = 0; i <= 24; i++) {
-      const yt = i / 24;
-      const y = yt * H;
-      const n = (fbm(yt * 3 + worldZ * 0.08) - 0.5) * W * 0.08;
-      pts.push({ x: W * 0.5 + n, y });
-    }
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
     ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    pts.forEach((p) => ctx.lineTo(p.x, p.y));
-    ctx.strokeStyle = "rgba(255, 196, 110, 0.16)";
-    ctx.lineWidth = 10;
-    ctx.lineCap = "round";
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(255, 230, 170, 0.22)";
-    ctx.lineWidth = 2.2;
-    ctx.stroke();
+    for (let i = 0; i <= 28; i++) {
+      const yt = i / 28, y = yt * H, n = (fbm(yt * 3 + worldZ * 0.08) - 0.5) * W * 0.08;
+      if (i) ctx.lineTo(W * 0.5 + n, y); else ctx.moveTo(W * 0.5 + n, y);
+    }
+    ctx.strokeStyle = "rgba(255, 186, 90, 0.12)"; ctx.lineWidth = 14; ctx.lineCap = "round"; ctx.stroke();
+    ctx.strokeStyle = "rgba(255, 230, 170, 0.2)"; ctx.lineWidth = 2.4; ctx.stroke();
     ctx.restore();
   }
-
   function drawFog() {
     ctx.save();
-    ctx.globalCompositeOperation = "source-over";
-    const g = ctx.createLinearGradient(0, H * 0.55, 0, H);
-    g.addColorStop(0, "rgba(12,10,24,0)");
-    g.addColorStop(1, "rgba(8,6,18,0.55)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    ctx.globalAlpha = 0.12;
+    const g = ctx.createLinearGradient(0, H * 0.52, 0, H);
+    g.addColorStop(0, "rgba(12,10,24,0)"); g.addColorStop(1, "rgba(8,6,18,0.58)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 0.13;
     for (let i = 0; i < 3; i++) {
       const y = (H * 0.2 * i + fogT * 18 * (i + 1)) % (H + 80) - 40;
       const grd = ctx.createRadialGradient(W * 0.5, y, 10, W * 0.5, y, W * 0.7);
-      grd.addColorStop(0, "rgba(160,150,200,0.25)");
-      grd.addColorStop(1, "rgba(160,150,200,0)");
-      ctx.fillStyle = grd;
-      ctx.fillRect(0, y - 80, W, 160);
+      grd.addColorStop(0, "rgba(160,150,200,0.25)"); grd.addColorStop(1, "rgba(160,150,200,0)");
+      ctx.fillStyle = grd; ctx.fillRect(0, y - 80, W, 160);
     }
     ctx.restore();
   }
-
   function drawAlcove() {
-    if (state !== STATE.FLY) return;
-    if (run.t < 20 || run.t > 40) return;
-    const ax = W * 0.92, ay = H * 0.42;
-    const pulse = 0.5 + 0.5 * Math.sin(time * 3);
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    if (state !== STATE.FLY || run.t < 20 || run.t > 40) return;
+    const ax = W * 0.92, ay = H * 0.42, pulse = 0.5 + 0.5 * Math.sin(time * 3);
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
     const g = ctx.createRadialGradient(ax, ay, 4, ax, ay, 90);
     g.addColorStop(0, `rgba(255,210,120,${run.alcoveGot ? 0.08 : 0.28 * pulse})`);
     g.addColorStop(1, "rgba(255,180,80,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(ax, ay, 90, 0, TAU);
-    ctx.fill();
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ax, ay, 90, 0, TAU); ctx.fill();
     if (!run.alcoveGot) {
       ctx.fillStyle = `rgba(255,220,150,${0.35 + pulse * 0.3})`;
-      ctx.beginPath();
-      ctx.arc(ax - 10, ay, 4, 0, TAU);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(ax - 10, ay, 4, 0, TAU); ctx.fill();
     }
     ctx.restore();
   }
+  function drawWorld() {
+    ctx.fillStyle = skyGradient(); ctx.fillRect(0, 0, W, H);
+    drawMoon(); drawStars(0); drawCliffs(); drawStars(1); drawRibbon(); drawAlcove(); drawFog();
+    if (speedLines.length) {
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = "rgba(255,230,200,0.18)"; ctx.lineWidth = 1;
+      for (const s of speedLines) { ctx.globalAlpha = s.a; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x, s.y + s.len); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
 
+  function wingPath(side, R, flap) {
+    ctx.beginPath();
+    ctx.moveTo(0, -R * 0.1);
+    ctx.bezierCurveTo(side * R * (0.2 + flap * 0.15), -R * 1.15, side * R * (1.55 + flap * 0.4), -R * 0.85, side * R * (1.35 + flap * 0.2), R * 0.15);
+    ctx.bezierCurveTo(side * R * 1.05, R * 0.55, side * R * 0.35, R * 0.45, 0, R * 0.12);
+    ctx.closePath();
+  }
   function drawMoth(m) {
     if (m.age < 0 || !m.alive) return;
     const fading = m.age > m.life;
     const fadeA = fading ? 1 - (m.age - m.life) / m.fade : 1;
     const pop = easeOut(clamp(m.age / 0.18, 0, 1));
-    const def = m.def;
+    const def = m.def, R = def.r;
     ctx.save();
     ctx.translate(m.x, m.y);
-    const ang = m.magnet ? Math.atan2(m.vy, m.vx) : Math.sin(m.phase) * 0.4;
-    ctx.rotate(ang);
+    ctx.rotate(m.magnet ? Math.atan2(m.vy, m.vx) : Math.sin(m.phase) * 0.35);
     ctx.scale(pop * (m.magnet ? m.stretch : 1), pop / Math.sqrt(m.stretch || 1));
-    ctx.globalAlpha = fadeA * (def.pale ? 0.55 : 0.95);
-    ctx.globalCompositeOperation = "lighter";
-
-    const R = def.r;
-    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 3.2);
-    glow.addColorStop(0, hsl(def.hue, def.sat, def.light, 0.55));
-    glow.addColorStop(0.4, hsl(def.hue, def.sat, def.light, 0.18));
+    ctx.globalAlpha = fadeA * (def.pale ? 0.62 : 0.96);
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 3.4);
+    glow.addColorStop(0, hsl(def.hue, def.sat, def.light, 0.5));
+    glow.addColorStop(0.35, hsl(def.hue, def.sat, def.light, 0.16));
     glow.addColorStop(1, hsl(def.hue, def.sat, def.light, 0));
-    ctx.fillStyle = glow;
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, R * 3.4, 0, TAU); ctx.fill();
+    ctx.restore();
+    const flap = Math.sin(m.phase * (def.zigzag ? 2.4 : 1.5)) * 0.55;
+    ctx.globalCompositeOperation = def.pale ? "lighter" : "source-over";
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = hsl(def.hue, def.sat * (def.pale ? 0.35 : 0.85), def.light - 8, def.pale ? 0.28 : 0.55);
+      wingPath(side, R, flap); ctx.fill();
+      ctx.strokeStyle = hsl(def.hue, def.sat, def.light + 12, def.pale ? 0.45 : 0.35); ctx.lineWidth = 0.7;
+      wingPath(side, R, flap); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(side * R * 0.7, -R * 0.15, side * R * (1.1 + flap * 0.2), -R * 0.55);
+      ctx.strokeStyle = hsl(def.hue, 40, 80, 0.35); ctx.stroke();
+    }
+    ctx.fillStyle = hsl(def.hue, def.sat * 0.6, def.light - 14, 0.4);
     ctx.beginPath();
-    ctx.arc(0, 0, R * 3.2, 0, TAU);
+    ctx.ellipse(-R * 0.55, R * 0.25, R * 0.45, R * 0.28, -0.5 - flap * 0.2, 0, TAU);
+    ctx.ellipse(R * 0.55, R * 0.25, R * 0.45, R * 0.28, 0.5 + flap * 0.2, 0, TAU);
     ctx.fill();
-
-    // wings
-    const flap = Math.sin(m.phase * (def.zigzag ? 2.2 : 1.4)) * 0.45;
-    ctx.fillStyle = hsl(def.hue, def.sat * (def.pale ? 0.4 : 1), def.light, 0.55);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = hsl(def.hue, 35, 18, 0.9);
+    ctx.beginPath(); ctx.ellipse(0, 0, R * 0.22, R * 0.55, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = hsl(def.hue, 40, 88, 0.95);
+    ctx.beginPath(); ctx.arc(0, -R * 0.12, R * 0.16, 0, TAU); ctx.fill();
+    ctx.strokeStyle = hsl(def.hue, 40, 80, 0.7); ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.ellipse(-R * 0.7, 0, R * 0.95, R * 0.55, -0.6 + flap, 0, TAU);
-    ctx.ellipse(R * 0.7, 0, R * 0.95, R * 0.55, 0.6 - flap, 0, TAU);
-    ctx.fill();
-
-    ctx.fillStyle = hsl(def.hue, 40, 90, 0.9);
-    ctx.beginPath();
-    ctx.arc(0, 0, R * 0.35, 0, TAU);
-    ctx.fill();
-
+    ctx.moveTo(-1, -R * 0.2); ctx.quadraticCurveTo(-R * 0.5, -R * 0.9, -R * 0.7, -R * 1.05);
+    ctx.moveTo(1, -R * 0.2); ctx.quadraticCurveTo(R * 0.5, -R * 0.9, R * 0.7, -R * 1.05);
+    ctx.stroke();
     if (def.shadow) {
-      ctx.strokeStyle = hsl(def.hue, 70, 80, 0.4);
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(0, 0, R * 1.4, 0, TAU);
-      ctx.stroke();
+      ctx.strokeStyle = hsl(def.hue, 70, 80, 0.45); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(0, 0, R * 1.45, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawThreat(th) {
+    if (!th.alive) return;
+    ctx.save(); ctx.translate(th.x, th.y); ctx.rotate(Math.sin(th.phase) * 0.25);
+    const flap = Math.sin(th.flap) * 0.7, R = th.r;
+    if (th.kind === "ashbat") {
+      ctx.fillStyle = "rgba(8,6,12,0.55)";
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-R * 1.8, -R * (1.1 + flap), -R * 2.4, R * 0.2, -R * 0.4, R * 0.5); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(R * 1.8, -R * (1.1 + flap), R * 2.4, R * 0.2, R * 0.4, R * 0.5); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(90,40,30,0.45)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-R * 0.2, 0); ctx.lineTo(-R * 1.6, -R * (0.6 + flap * 0.4));
+      ctx.moveTo(R * 0.2, 0); ctx.lineTo(R * 1.6, -R * (0.6 + flap * 0.4)); ctx.stroke();
+      ctx.fillStyle = "#1a1218"; ctx.beginPath(); ctx.ellipse(0, 0, R * 0.35, R * 0.55, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#ff6a3a"; ctx.beginPath(); ctx.arc(-R * 0.12, -R * 0.1, 1.6, 0, TAU); ctx.arc(R * 0.12, -R * 0.1, 1.6, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = "rgba(255,80,40,0.18)"; ctx.beginPath(); ctx.arc(0, 0, R * 1.6, 0, TAU); ctx.fill();
+    } else {
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(0, 0, 1, 0, 0, R * 2.2);
+      g.addColorStop(0, "rgba(255,90,40,0.45)"); g.addColorStop(0.4, "rgba(80,30,20,0.35)"); g.addColorStop(1, "rgba(20,10,10,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * 2.2, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#2a1a16"; ctx.beginPath(); ctx.arc(0, 0, R * 0.7, 0, TAU); ctx.fill();
+      ctx.fillStyle = `rgba(255,110,50,${0.5 + 0.4 * Math.sin(th.phase * 3)})`;
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.28, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "rgba(40,20,16,0.7)"; ctx.lineWidth = 1;
+      for (let i = 0; i < 5; i++) {
+        const a = th.phase + i * TAU / 5;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 0.4, Math.sin(a) * R * 0.4);
+        ctx.lineTo(Math.cos(a) * R * 1.15, Math.sin(a) * R * 1.15); ctx.stroke();
+      }
     }
     ctx.restore();
   }
 
   function drawLantern() {
     const lp = lanternPx();
-    ctx.save();
-    ctx.translate(lp.x, lp.y);
-    ctx.rotate(lantern.roll);
-
-    // trail
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    const flicker = 0.92 + 0.08 * Math.sin(time * 11) + 0.04 * Math.sin(time * 23);
+    const dim = 0.45 + run.wick * 0.18;
+    const gMul = lantern.glow * flicker * (state === STATE.FLY ? dim : 1);
+    ctx.save(); ctx.translate(lp.x, lp.y); ctx.rotate(lantern.roll);
+    if (run.invuln > 0 && ((time * 18) | 0) % 2 === 0) ctx.globalAlpha = 0.55;
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < lantern.trail.length; i++) {
       const t = lantern.trail[i];
-      ctx.fillStyle = `rgba(255,170,70,${t.a * 0.22})`;
-      ctx.beginPath();
-      ctx.arc(t.x - lp.x, t.y - lp.y + (lantern.trail.length - i) * 0.4, t.r * t.a * 0.5, 0, TAU);
-      ctx.fill();
+      ctx.fillStyle = `rgba(255,160,60,${t.a * 0.18})`;
+      ctx.beginPath(); ctx.ellipse(t.x - lp.x, t.y - lp.y + (lantern.trail.length - i) * 0.45, t.r * t.a * 0.28, t.r * t.a * 0.55, 0, 0, TAU); ctx.fill();
     }
     ctx.restore();
-
-    const gR = 52 * lantern.glow;
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const g = ctx.createRadialGradient(0, -6, 4, 0, -6, gR);
-    g.addColorStop(0, `rgba(255,220,140,${0.55 * Math.min(1.4, lantern.glow)})`);
-    g.addColorStop(0.35, `rgba(255,140,50,${0.22 * lantern.glow})`);
-    g.addColorStop(1, "rgba(255,100,30,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(0, -6, gR, 0, TAU);
-    ctx.fill();
+    const gR = 70 * gMul;
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(0, -8, 3, 0, -8, gR);
+    g.addColorStop(0, `rgba(255,236,180,${0.62 * Math.min(1.5, gMul)})`);
+    g.addColorStop(0.18, `rgba(255,190,90,${0.32 * gMul})`);
+    g.addColorStop(0.45, `rgba(255,120,40,${0.12 * gMul})`);
+    g.addColorStop(1, "rgba(255,80,20,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -8, gR, 0, TAU); ctx.fill(); ctx.restore();
+    ctx.strokeStyle = "#5a3a22"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, -22, 6, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = "#c9a36a"; ctx.beginPath(); ctx.roundRect(-11, -20, 22, 6, 2); ctx.fill();
+    ctx.fillStyle = "#8a6238"; ctx.fillRect(-12, -16, 24, 3);
+    ctx.fillStyle = "rgba(255, 210, 140, 0.16)"; ctx.beginPath(); ctx.roundRect(-10, -12, 20, 26, 3); ctx.fill();
+    ctx.strokeStyle = "#d4b07a"; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = "#6a4a28"; ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, 14); ctx.moveTo(-10, 1); ctx.lineTo(10, 1); ctx.stroke();
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const flameH = 11 * lantern.flame * flicker;
+    const fg = ctx.createRadialGradient(0, 2, 0.5, 0, 2, 10);
+    fg.addColorStop(0, `rgba(255,250,220,${0.95 * lantern.flame})`);
+    fg.addColorStop(0.35, `rgba(255,190,80,${0.7 * lantern.flame})`);
+    fg.addColorStop(1, "rgba(255,80,20,0)");
+    ctx.fillStyle = fg; ctx.beginPath();
+    ctx.moveTo(0, 8); ctx.quadraticCurveTo(-5.5 * lantern.flame, 2, 0, -flameH);
+    ctx.quadraticCurveTo(5.5 * lantern.flame, 2, 0, 8); ctx.fill();
+    ctx.fillStyle = "rgba(255,250,230,0.95)"; ctx.beginPath(); ctx.ellipse(0, 3, 2.1, 4.2 * lantern.flame, 0, 0, TAU); ctx.fill();
     ctx.restore();
-
-    // body
-    ctx.fillStyle = "#2a1c12";
-    ctx.beginPath();
-    ctx.roundRect(-11, -8, 22, 28, 5);
-    ctx.fill();
-    ctx.fillStyle = "#c9a36a";
-    ctx.fillRect(-12, -10, 24, 4);
-    ctx.fillRect(-8, 18, 16, 3);
-
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = `rgba(255, 200, 90, ${0.55 + 0.2 * Math.sin(time * 8)})`;
-    ctx.beginPath();
-    ctx.ellipse(0, 4, 7, 10, 0, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,245,210,0.9)";
-    ctx.beginPath();
-    ctx.arc(0, 2, 3.2, 0, TAU);
-    ctx.fill();
-    ctx.restore();
-
-    // little wings / fins
-    ctx.fillStyle = "rgba(255,180,80,0.35)";
-    ctx.beginPath();
-    ctx.moveTo(-12, 4);
-    ctx.quadraticCurveTo(-24, 0, -14, 16);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(12, 4);
-    ctx.quadraticCurveTo(24, 0, 14, 16);
-    ctx.closePath();
-    ctx.fill();
-
+    ctx.fillStyle = "#2a1c10"; ctx.fillRect(-1, 7, 2, 6);
+    ctx.fillStyle = "#a07848"; ctx.beginPath(); ctx.roundRect(-9, 14, 18, 5, 1.5); ctx.fill();
+    ctx.fillStyle = "#6a4a28"; ctx.fillRect(-7, 18, 14, 2);
+    ctx.fillStyle = "rgba(201,163,106,0.55)";
+    ctx.beginPath(); ctx.moveTo(-11, -4); ctx.lineTo(-18, 2); ctx.lineTo(-11, 10); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(11, -4); ctx.lineTo(18, 2); ctx.lineTo(11, 10); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
   function drawPulseRings() {
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
     for (let i = pulseRings.length - 1; i >= 0; i--) {
       const r = pulseRings[i];
       r.life -= 1 / 60;
       const t = 1 - r.life / 0.35;
-      r.r = lerp(8, r.max, easeOut(clamp(t, 0, 1)));
-      r.a = 1 - t;
-      ctx.strokeStyle = `rgba(255,200,110,${Math.max(0, r.a) * 0.55})`;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(r.x, r.y, r.r, 0, TAU);
-      ctx.stroke();
+      r.r = lerp(8, r.max, easeOut(clamp(t, 0, 1))); r.a = 1 - t;
+      ctx.strokeStyle = `rgba(255,200,110,${Math.max(0, r.a) * 0.55})`; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,240,200,${Math.max(0, r.a) * 0.2})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r * 0.72, 0, TAU); ctx.stroke();
       if (r.life <= 0) pulseRings.splice(i, 1);
     }
     ctx.restore();
   }
 
+  function roundGlyph(x, y, w, h) { ctx.beginPath(); ctx.roundRect(x - w, y - h, w * 2, h * 2, 10); ctx.stroke(); }
   function drawGlyphs() {
-    if (state !== STATE.FLY) return;
-    if (!run.teachTap && !run.teachHold) return;
+    if (state !== STATE.FLY || (!run.teachTap && !run.teachHold)) return;
     const lp = lanternPx();
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.font = "600 13px Palatino Linotype, Georgia, serif";
+    ctx.save(); ctx.textAlign = "center"; ctx.font = "600 13px Palatino Linotype, Georgia, serif";
     if (run.t < 3.2 && run.teachTap) {
-      const a = 0.35 + 0.25 * Math.sin(time * 6);
-      ctx.globalAlpha = a;
-      ctx.strokeStyle = "rgba(255,230,190,0.8)";
-      ctx.fillStyle = "rgba(255,230,190,0.85)";
-      ctx.lineWidth = 1.5;
-      roundGlyph(lp.x, H * 0.82, 36, 22);
-      ctx.fillText("TAP", lp.x, H * 0.825);
-      ctx.font = "11px Palatino Linotype, Georgia, serif";
-      ctx.fillText("pulse", lp.x, H * 0.86);
+      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(time * 6);
+      ctx.strokeStyle = "rgba(255,230,190,0.8)"; ctx.fillStyle = "rgba(255,230,190,0.85)"; ctx.lineWidth = 1.5;
+      roundGlyph(lp.x, H * 0.82, 36, 22); ctx.fillText("TAP", lp.x, H * 0.825);
+      ctx.font = "11px Palatino Linotype, Georgia, serif"; ctx.fillText("pulse", lp.x, H * 0.86);
     } else if (run.t >= 3.0 && run.t < 8 && run.teachHold) {
-      const a = 0.35 + 0.25 * Math.sin(time * 4);
-      ctx.globalAlpha = a;
-      ctx.fillStyle = "rgba(255,230,190,0.85)";
-      ctx.strokeStyle = "rgba(255,230,190,0.8)";
-      ctx.lineWidth = 1.5;
-      // left / right chevrons
-      roundGlyph(W * 0.18, H * 0.82, 40, 22);
-      roundGlyph(W * 0.82, H * 0.82, 40, 22);
-      ctx.fillText("HOLD", W * 0.18, H * 0.825);
-      ctx.fillText("HOLD", W * 0.82, H * 0.825);
-      ctx.font = "11px Palatino Linotype, Georgia, serif";
-      ctx.fillText("bank", W * 0.5, H * 0.86);
-      // arrows
-      ctx.beginPath();
-      ctx.moveTo(W * 0.18 - 18, H * 0.79);
-      ctx.lineTo(W * 0.18 - 28, H * 0.82);
-      ctx.lineTo(W * 0.18 - 18, H * 0.85);
-      ctx.moveTo(W * 0.82 + 18, H * 0.79);
-      ctx.lineTo(W * 0.82 + 28, H * 0.82);
-      ctx.lineTo(W * 0.82 + 18, H * 0.85);
-      ctx.stroke();
+      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(time * 4);
+      ctx.fillStyle = "rgba(255,230,190,0.85)"; ctx.strokeStyle = "rgba(255,230,190,0.8)"; ctx.lineWidth = 1.5;
+      roundGlyph(W * 0.5, H * 0.82, 70, 22); ctx.fillText("DRAG", W * 0.5, H * 0.825);
+      ctx.font = "11px Palatino Linotype, Georgia, serif"; ctx.fillText("follow  ·  vertical ignored", W * 0.5, H * 0.86);
     }
     ctx.restore();
-    if (run.t > 8) {
-      run.teachTap = false;
-      run.teachHold = false;
-    }
-  }
-
-  function roundGlyph(x, y, w, h) {
-    ctx.beginPath();
-    ctx.roundRect(x - w, y - h, w * 2, h * 2, 10);
-    ctx.stroke();
+    if (run.t > 8) { run.teachTap = false; run.teachHold = false; }
   }
 
   function drawHUD() {
     if (state !== STATE.FLY && state !== STATE.LAND) return;
-    ctx.save();
-    ctx.fillStyle = "rgba(255,236,210,0.82)";
-    ctx.font = "600 15px Palatino Linotype, Georgia, serif";
+    const pad = Math.max(14, W * 0.04), top = Math.max(22, H * 0.038);
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.75)"; ctx.shadowBlur = 10;
     ctx.textAlign = "left";
-    ctx.shadowColor = "rgba(0,0,0,0.6)";
-    ctx.shadowBlur = 8;
-    ctx.fillText(`nectar  ${run.nectar}`, 18, 32);
-
-    // combo
+    ctx.fillStyle = "rgba(255,236,210,0.55)";
+    ctx.font = `600 ${Math.round(Math.max(11, W * 0.032))}px Palatino Linotype, Georgia, serif`;
+    ctx.fillText("NECTAR", pad, top);
+    ctx.fillStyle = "rgba(255,236,210,0.95)";
+    ctx.font = `700 ${Math.round(Math.max(20, W * 0.055))}px Palatino Linotype, Georgia, serif`;
+    ctx.fillText(String(run.nectar), pad, top + Math.max(22, W * 0.058));
+    ctx.textAlign = "right";
+    const remain = Math.max(0, run.dur - run.t);
+    const mm = Math.floor(remain / 60), ss = Math.floor(remain % 60);
+    ctx.fillStyle = "rgba(255,236,210,0.55)";
+    ctx.font = `600 ${Math.round(Math.max(11, W * 0.032))}px Palatino Linotype, Georgia, serif`;
+    ctx.fillText("FLIGHT", W - pad, top);
+    ctx.fillStyle = remain < 8 ? "rgba(255,170,110,0.95)" : "rgba(255,236,210,0.95)";
+    ctx.font = `700 ${Math.round(Math.max(20, W * 0.055))}px Palatino Linotype, Georgia, serif`;
+    ctx.fillText(`${mm}:${ss.toString().padStart(2, "0")}`, W - pad, top + Math.max(22, W * 0.058));
+    const barY = top + Math.max(30, W * 0.078), barW = W * 0.42, barX = (W - barW) / 2;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,236,210,0.12)"; ctx.beginPath(); ctx.roundRect(barX, barY, barW, 4, 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,196,110,0.8)"; ctx.beginPath(); ctx.roundRect(barX, barY, barW * clamp(run.t / run.dur, 0, 1), 4, 2); ctx.fill();
+    const wickY = barY + 18;
+    ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,236,210,0.5)";
+    ctx.font = `600 ${Math.round(Math.max(10, W * 0.028))}px Palatino Linotype, Georgia, serif`;
+    ctx.fillText("WICK", W / 2, wickY);
+    for (let i = 0; i < WICK_MAX; i++) {
+      const x = W / 2 + (i - 1) * 22, y = wickY + 14, on = i < run.wick;
+      ctx.save(); ctx.globalCompositeOperation = on ? "lighter" : "source-over";
+      const wg = ctx.createRadialGradient(x, y, 1, x, y, 10);
+      wg.addColorStop(0, on ? "rgba(255,220,140,0.9)" : "rgba(80,60,40,0.35)"); wg.addColorStop(1, "rgba(255,140,40,0)");
+      ctx.fillStyle = wg; ctx.beginPath(); ctx.arc(x, y, 10, 0, TAU); ctx.fill();
+      ctx.fillStyle = on ? "rgba(255,210,120,0.95)" : "rgba(70,50,40,0.55)";
+      ctx.beginPath(); ctx.moveTo(x, y + 6); ctx.quadraticCurveTo(x - 5, y + 1, x, y - 8); ctx.quadraticCurveTo(x + 5, y + 1, x, y + 6); ctx.fill();
+      ctx.restore();
+    }
     if (run.combo >= 1) {
-      ctx.textAlign = "center";
-      const s = 22 + comboPop * 14 + Math.min(run.combo, 10);
+      ctx.shadowBlur = 12; ctx.shadowColor = "rgba(255,160,60,0.35)";
+      const s = Math.round(Math.max(22, W * 0.06) + comboPop * 14 + Math.min(run.combo, 10));
       ctx.font = `700 ${s}px Palatino Linotype, Georgia, serif`;
-      ctx.fillStyle = run.kindledT > 0 ? "rgba(255,210,120,0.95)" : "rgba(255,236,210,0.9)";
-      ctx.fillText(String(fibStep(run.combo)), W / 2, 48);
-      ctx.font = "12px Palatino Linotype, Georgia, serif";
+      ctx.fillStyle = run.kindledT > 0 ? "rgba(255,210,120,0.95)" : "rgba(255,236,210,0.92)";
+      ctx.fillText(String(fibStep(run.combo)), W / 2, wickY + 52);
+      ctx.font = `600 ${Math.round(Math.max(11, W * 0.03))}px Palatino Linotype, Georgia, serif`;
       ctx.fillStyle = "rgba(255,236,210,0.55)";
-      ctx.fillText(run.kindledT > 0 ? "kindled" : "combo", W / 2, 64);
+      ctx.fillText(run.kindledT > 0 ? "kindled" : "combo", W / 2, wickY + 68);
     }
-
     if (lastCatchT > 0) {
-      ctx.textAlign = "center";
       ctx.globalAlpha = clamp(lastCatchT * 1.4, 0, 1);
-      ctx.font = "italic 13px Palatino Linotype, Georgia, serif";
-      ctx.fillStyle = "rgba(255,220,170,0.85)";
-      ctx.fillText(lastCatchName, W / 2, 82);
-      ctx.globalAlpha = 1;
+      ctx.font = `italic ${Math.round(Math.max(12, W * 0.032))}px Palatino Linotype, Georgia, serif`;
+      ctx.fillStyle = "rgba(255,220,170,0.85)"; ctx.fillText(lastCatchName, W / 2, wickY + 86); ctx.globalAlpha = 1;
     }
-
-    // pulse cd pip
     const cd = lantern.pulseCd / pulseCdMax();
     ctx.textAlign = "right";
-    ctx.font = "12px Palatino Linotype, Georgia, serif";
-    ctx.fillStyle = "rgba(255,236,210,0.45)";
-    ctx.fillText("pulse", W - 18, 28);
-    ctx.strokeStyle = "rgba(255,200,120,0.35)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(W - 28, 44, 7, 0, TAU);
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(255,200,120,0.9)";
-    ctx.beginPath();
-    ctx.arc(W - 28, 44, 7, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - cd));
-    ctx.stroke();
-
-    // time ribbon
-    const p = clamp(run.t / run.dur, 0, 1);
-    ctx.fillStyle = "rgba(255,236,210,0.12)";
-    ctx.fillRect(W * 0.22, 8, W * 0.56, 3);
-    ctx.fillStyle = "rgba(255,196,110,0.7)";
-    ctx.fillRect(W * 0.22, 8, W * 0.56 * p, 3);
-
-    ctx.restore();
-  }
-
-  function drawSpeedLines() {
-    if (!speedLines.length) return;
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = "rgba(255,230,200,0.18)";
-    ctx.lineWidth = 1;
-    for (const s of speedLines) {
-      ctx.globalAlpha = s.a;
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(s.x, s.y + s.len);
-      ctx.stroke();
-    }
+    ctx.font = `600 ${Math.round(Math.max(10, W * 0.028))}px Palatino Linotype, Georgia, serif`;
+    ctx.fillStyle = "rgba(255,236,210,0.4)"; ctx.fillText("pulse", W - pad, H - 28);
+    ctx.strokeStyle = "rgba(255,200,120,0.35)"; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.arc(W - pad - 10, H - 46, 8, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,200,120,0.95)";
+    ctx.beginPath(); ctx.arc(W - pad - 10, H - 46, 8, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - cd)); ctx.stroke();
     ctx.restore();
   }
 
   function drawTitle() {
-    ctx.save();
-    const a = clamp((titleT - 0.2) / 0.8, 0, 1);
-    ctx.globalAlpha = a;
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#f4ead8";
-    ctx.shadowColor = "rgba(255,160,60,0.35)";
-    ctx.shadowBlur = 24;
+    ctx.save(); ctx.globalAlpha = clamp((titleT - 0.2) / 0.8, 0, 1);
+    ctx.textAlign = "center"; ctx.fillStyle = "#f4ead8";
+    ctx.shadowColor = "rgba(255,160,60,0.35)"; ctx.shadowBlur = 24;
     ctx.font = `600 ${Math.round(W * 0.13)}px Palatino Linotype, Georgia, serif`;
-    ctx.fillText("KINDLED", W / 2, H * 0.28);
-    ctx.shadowBlur = 0;
+    ctx.fillText("KINDLED", W / 2, H * 0.28); ctx.shadowBlur = 0;
     ctx.font = "italic 13px Palatino Linotype, Georgia, serif";
-    ctx.fillStyle = "rgba(244,234,216,0.45)";
-    ctx.fillText("working title", W / 2, H * 0.28 + 22);
-
+    ctx.fillStyle = "rgba(244,234,216,0.45)"; ctx.fillText("working title", W / 2, H * 0.28 + 22);
     ctx.font = "14px Palatino Linotype, Georgia, serif";
     ctx.fillStyle = `rgba(244,234,216,${0.4 + 0.3 * Math.sin(titlePulse * 2.4)})`;
     ctx.fillText("tap to fly", W / 2, H * 0.88);
-    ctx.font = "11px Palatino Linotype, Georgia, serif";
-    ctx.fillStyle = "rgba(244,234,216,0.32)";
-    ctx.fillText("TAP pulse  ·  HOLD bank", W / 2, H * 0.91);
-    if (save.flights > 0) {
-      ctx.fillText(`roost lv ${save.roost}   nectar ${save.nectar}`, W / 2, H * 0.945);
-    }
-    ctx.restore();
-  }
-
-  function drawRoost() {
-    const grow = save.roost;
-    const cx = W * 0.5;
-    const baseY = H * 0.52;
-
-    // vignette
-    ctx.save();
-    const vg = ctx.createRadialGradient(cx, H * 0.42, 20, cx, H * 0.42, H * 0.7);
-    vg.addColorStop(0, "rgba(40,24,16,0.15)");
-    vg.addColorStop(1, "rgba(4,3,10,0.55)");
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(cx, baseY);
-    // trunk
-    ctx.fillStyle = "#2a1a12";
-    ctx.beginPath();
-    ctx.moveTo(-10 - grow, 80);
-    ctx.quadraticCurveTo(-4, 20, -8, -40 - grow * 6);
-    ctx.lineTo(8, -40 - grow * 6);
-    ctx.quadraticCurveTo(4, 20, 10 + grow, 80);
-    ctx.closePath();
-    ctx.fill();
-
-    // canopy
-    ctx.globalCompositeOperation = "lighter";
-    for (let i = 0; i < 5 + grow; i++) {
-      const ang = -1.4 + i * 0.35;
-      const len = 40 + grow * 5 + (i % 3) * 8;
-      const x = Math.cos(ang) * len * 0.4;
-      const y = -50 - grow * 5 + Math.sin(ang) * 8;
-      const rad = 22 + grow * 2 + (i % 2) * 8;
-      const g = ctx.createRadialGradient(x, y, 2, x, y, rad);
-      g.addColorStop(0, `rgba(255,170,70,${0.12 + grow * 0.02})`);
-      g.addColorStop(1, "rgba(80,40,10,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x, y, rad, 0, TAU);
-      ctx.fill();
-    }
-
-    // hanging lanterns — more each landing
-    const nLan = Math.min(8, 2 + grow);
-    for (let i = 0; i < nLan; i++) {
-      const x = -50 + i * (100 / Math.max(1, nLan - 1));
-      const y = -10 + Math.sin(i * 1.7 + roostT) * 4;
-      ctx.strokeStyle = "rgba(200,160,90,0.35)";
-      ctx.beginPath();
-      ctx.moveTo(x * 0.3, -40);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      ctx.fillStyle = `rgba(255,190,80,${0.45 + 0.2 * Math.sin(roostT * 3 + i)})`;
-      ctx.beginPath();
-      ctx.arc(x, y + 6, 4 + (i === 0 ? 2 : 0), 0, TAU);
-      ctx.fill();
-    }
-    ctx.restore();
-
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#f4ead8";
-    ctx.font = "600 22px Palatino Linotype, Georgia, serif";
-    ctx.globalAlpha = clamp(roostT, 0, 1);
-    ctx.fillText("roost", W / 2, H * 0.12);
-    ctx.font = "13px Palatino Linotype, Georgia, serif";
-    ctx.fillStyle = "rgba(244,234,216,0.55)";
-    ctx.fillText(`+${run.nectar} nectar   ·   best ${fibStep(run.bestCombo) || run.bestCombo}`, W / 2, H * 0.16);
-    if (run.alcoveGot) {
-      ctx.fillStyle = "rgba(255,210,120,0.7)";
-      ctx.fillText("a relic woke in the alcove", W / 2, H * 0.195);
-    }
-
-    // cards
-    cards.forEach((c, i) => {
-      const sel = picked === i;
-      const hov = hoverCard === i;
-      const y = c.y + (sel ? -8 : 0);
-      ctx.globalAlpha = clamp(roostT - 0.15 * i, 0, 1);
-      ctx.fillStyle = sel ? "rgba(60,40,20,0.85)" : "rgba(20,16,32,0.72)";
-      ctx.strokeStyle = sel || hov ? "rgba(255,200,120,0.7)" : "rgba(255,200,120,0.28)";
-      ctx.lineWidth = sel ? 2 : 1;
-      ctx.beginPath();
-      ctx.roundRect(c.x, y, c.w, c.h, 10);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#f4ead8";
-      ctx.font = "600 13px Palatino Linotype, Georgia, serif";
-      ctx.textAlign = "center";
-      wrapText(c.name, c.x + c.w / 2, y + 28, c.w - 12, 16);
-      ctx.font = "11px Palatino Linotype, Georgia, serif";
-      ctx.fillStyle = "rgba(244,234,216,0.6)";
-      wrapText(c.sub, c.x + c.w / 2, y + 58, c.w - 14, 14);
-      ctx.fillStyle = "rgba(255,196,110,0.55)";
-      ctx.font = "italic 10px Palatino Linotype, Georgia, serif";
-      wrapText("chip: " + c.chip, c.x + c.w / 2, y + c.h - 28, c.w - 12, 12);
-    });
-
-    if (picked >= 0) {
-      ctx.globalAlpha = 0.7 + 0.3 * Math.sin(roostT * 3);
-      ctx.fillStyle = "#f4ead8";
-      ctx.font = "600 16px Palatino Linotype, Georgia, serif";
-      ctx.fillText("fly again", W / 2, H * 0.88);
-      ctx.font = "11px Palatino Linotype, Georgia, serif";
-      ctx.fillStyle = "rgba(244,234,216,0.4)";
-      ctx.fillText("unlimited  ·  no energy", W / 2, H * 0.91);
-    } else {
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = "rgba(244,234,216,0.5)";
-      ctx.font = "12px Palatino Linotype, Georgia, serif";
-      ctx.fillText("pick a blessing", W / 2, H * 0.88);
-    }
+    ctx.font = "11px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.32)";
+    ctx.fillText("TAP pulse  ·  DRAG to bank", W / 2, H * 0.91);
+    if (save.flights > 0) ctx.fillText(`roost lv ${save.roost}   nectar ${save.nectar}`, W / 2, H * 0.945);
     ctx.restore();
   }
 
   function wrapText(text, x, y, maxW, lh) {
-    const words = text.split(" ");
-    let line = "";
-    let yy = y;
+    const words = text.split(" "); let line = "", yy = y;
     for (const w of words) {
       const test = line ? line + " " + w : w;
-      if (ctx.measureText(test).width > maxW) {
-        ctx.fillText(line, x, yy);
-        line = w;
-        yy += lh;
-      } else line = test;
+      if (ctx.measureText(test).width > maxW) { ctx.fillText(line, x, yy); line = w; yy += lh; }
+      else line = test;
     }
     ctx.fillText(line, x, yy);
   }
 
-  function drawLandFlash() {
-    const a = clamp(1 - landT / 1.2, 0, 1);
+  function drawRoost() {
+    const grow = save.roost, cx = W * 0.5, baseY = H * 0.52;
     ctx.save();
+    const vg = ctx.createRadialGradient(cx, H * 0.42, 20, cx, H * 0.42, H * 0.7);
+    vg.addColorStop(0, "rgba(40,24,16,0.15)"); vg.addColorStop(1, "rgba(4,3,10,0.55)");
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H); ctx.restore();
+    ctx.save(); ctx.translate(cx, baseY);
+    ctx.fillStyle = "#2a1a12"; ctx.beginPath();
+    ctx.moveTo(-10 - grow, 80); ctx.quadraticCurveTo(-4, 20, -8, -40 - grow * 6);
+    ctx.lineTo(8, -40 - grow * 6); ctx.quadraticCurveTo(4, 20, 10 + grow, 80); ctx.closePath(); ctx.fill();
     ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = `rgba(255,180,80,${a * 0.18})`;
-    ctx.fillRect(0, 0, W, H);
-    ctx.textAlign = "center";
-    ctx.fillStyle = `rgba(255,236,210,${a})`;
-    ctx.font = "600 28px Palatino Linotype, Georgia, serif";
-    ctx.fillText("home", W / 2, H * 0.4);
+    for (let i = 0; i < 5 + grow; i++) {
+      const ang = -1.4 + i * 0.35, len = 40 + grow * 5 + (i % 3) * 8;
+      const x = Math.cos(ang) * len * 0.4, y = -50 - grow * 5 + Math.sin(ang) * 8;
+      const rad = 22 + grow * 2 + (i % 2) * 8;
+      const g = ctx.createRadialGradient(x, y, 2, x, y, rad);
+      g.addColorStop(0, `rgba(255,170,70,${0.12 + grow * 0.02})`); g.addColorStop(1, "rgba(80,40,10,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.fill();
+    }
+    const nLan = Math.min(8, 2 + grow);
+    for (let i = 0; i < nLan; i++) {
+      const x = -50 + i * (100 / Math.max(1, nLan - 1)), y = -10 + Math.sin(i * 1.7 + roostT) * 4;
+      ctx.strokeStyle = "rgba(200,160,90,0.35)"; ctx.beginPath(); ctx.moveTo(x * 0.3, -40); ctx.lineTo(x, y); ctx.stroke();
+      ctx.fillStyle = `rgba(255,190,80,${0.45 + 0.2 * Math.sin(roostT * 3 + i)})`;
+      ctx.beginPath(); ctx.arc(x, y + 6, 4 + (i === 0 ? 2 : 0), 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+    ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "#f4ead8";
+    ctx.font = "600 22px Palatino Linotype, Georgia, serif"; ctx.globalAlpha = clamp(roostT, 0, 1);
+    ctx.fillText("roost", W / 2, H * 0.12);
+    ctx.font = "13px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.55)";
+    ctx.fillText(`${run.crashed ? "crash land  ·  wick spent" : "home"}   ·   +${run.nectar} nectar   ·   best ${fibStep(run.bestCombo) || run.bestCombo}`, W / 2, H * 0.16);
+    if (run.alcoveGot) { ctx.fillStyle = "rgba(255,210,120,0.7)"; ctx.fillText("a relic woke in the alcove", W / 2, H * 0.195); }
+    cards.forEach((c, i) => {
+      const sel = picked === i, hov = hoverCard === i, y = c.y + (sel ? -8 : 0);
+      ctx.globalAlpha = clamp(roostT - 0.15 * i, 0, 1);
+      ctx.fillStyle = sel ? "rgba(60,40,20,0.85)" : "rgba(20,16,32,0.72)";
+      ctx.strokeStyle = sel || hov ? "rgba(255,200,120,0.7)" : "rgba(255,200,120,0.28)";
+      ctx.lineWidth = sel ? 2 : 1; ctx.beginPath(); ctx.roundRect(c.x, y, c.w, c.h, 10); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#f4ead8"; ctx.font = "600 13px Palatino Linotype, Georgia, serif"; ctx.textAlign = "center";
+      wrapText(c.name, c.x + c.w / 2, y + 28, c.w - 12, 16);
+      ctx.font = "11px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.6)";
+      wrapText(c.sub, c.x + c.w / 2, y + 58, c.w - 14, 14);
+      ctx.fillStyle = "rgba(255,196,110,0.55)"; ctx.font = "italic 10px Palatino Linotype, Georgia, serif";
+      wrapText("chip: " + c.chip, c.x + c.w / 2, y + c.h - 28, c.w - 12, 12);
+    });
+    if (picked >= 0) {
+      ctx.globalAlpha = 0.7 + 0.3 * Math.sin(roostT * 3); ctx.fillStyle = "#f4ead8";
+      ctx.font = "600 16px Palatino Linotype, Georgia, serif"; ctx.fillText("fly again", W / 2, H * 0.88);
+      ctx.font = "11px Palatino Linotype, Georgia, serif"; ctx.fillStyle = "rgba(244,234,216,0.4)";
+      ctx.fillText("unlimited  ·  no energy", W / 2, H * 0.91);
+    } else {
+      ctx.globalAlpha = 0.55; ctx.fillStyle = "rgba(244,234,216,0.5)";
+      ctx.font = "12px Palatino Linotype, Georgia, serif"; ctx.fillText("pick a blessing", W / 2, H * 0.88);
+    }
     ctx.restore();
   }
 
-  function drawWorld() {
-    ctx.fillStyle = skyGradient();
+  function drawLandFlash() {
+    const a = clamp(1 - landT / 1.2, 0, 1);
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = run.crashed ? `rgba(255,90,50,${a * 0.2})` : `rgba(255,180,80,${a * 0.18})`;
     ctx.fillRect(0, 0, W, H);
-    drawStars(0);
-    drawCliffs();
-    drawStars(1);
-    drawRibbon();
-    drawAlcove();
-    drawFog();
-    drawSpeedLines();
+    ctx.textAlign = "center"; ctx.fillStyle = `rgba(255,236,210,${a})`;
+    ctx.font = "600 28px Palatino Linotype, Georgia, serif";
+    ctx.fillText(run.crashed ? "crash land" : "home", W / 2, H * 0.4);
+    ctx.font = "13px Palatino Linotype, Georgia, serif"; ctx.fillStyle = `rgba(255,236,210,${a * 0.6})`;
+    ctx.fillText(run.crashed ? "the wick guttered  ·  roost waits" : "the canyon exhales", W / 2, H * 0.44);
+    ctx.restore();
   }
 
   function applyCamera(fn) {
     ctx.save();
-    ctx.translate(W / 2, H / 2);
+    const sh = run.shake * 7;
+    ctx.translate(W / 2 + (Math.random() - 0.5) * sh * 2, H / 2 + (Math.random() - 0.5) * sh);
     ctx.rotate(lantern.roll * 0.35);
-    const zoom = 1 + (run.kindledT > 0 ? 0.02 : 0);
-    ctx.scale(zoom, zoom);
-    ctx.translate(-W / 2, -H / 2);
-    fn();
-    ctx.restore();
+    const zoom = 1 + (run.kindledT > 0 ? 0.02 : 0) + run.skimT * 0.04;
+    ctx.scale(zoom, zoom); ctx.translate(-W / 2, -H / 2); fn(); ctx.restore();
   }
-
   function frame() {
     applyCamera(() => {
       drawWorld();
       if (state === STATE.FLY || state === STATE.LAND || state === STATE.TITLE) {
+        for (const th of threats) drawThreat(th);
         for (const m of moths) drawMoth(m);
-        drawPulseRings();
-        drawParts();
-        drawLantern();
-        drawFloats();
+        drawPulseRings(); drawParts(); drawLantern(); drawFloats();
       }
     });
+    if (run.hitFlash > 0) { ctx.fillStyle = `rgba(120,20,10,${run.hitFlash * 0.28})`; ctx.fillRect(0, 0, W, H); }
     if (state === STATE.TITLE) drawTitle();
-    if (state === STATE.FLY) {
-      drawGlyphs();
-      drawHUD();
-    }
-    if (state === STATE.LAND) {
-      drawHUD();
-      drawLandFlash();
-    }
-    if (state === STATE.ROOST) {
-      drawRoost();
-      drawParts();
-    }
+    if (state === STATE.FLY) { drawGlyphs(); drawHUD(); }
+    if (state === STATE.LAND) { drawHUD(); drawLandFlash(); }
+    if (state === STATE.ROOST) { drawRoost(); drawParts(); }
   }
 
-  // ─── loop ────────────────────────────────────────────────────────────────
   let last = performance.now();
   function tick(now) {
-    let dt = (now - last) / 1000;
-    last = now;
-    if (dt > 0.05) dt = 0.05;
-    time += dt;
-
+    let dt = (now - last) / 1000; last = now; if (dt > 0.05) dt = 0.05; time += dt;
     if (state === STATE.TITLE) updateTitle(dt);
     else if (state === STATE.FLY) updateFly(dt);
     else if (state === STATE.LAND) updateLand(dt);
     else if (state === STATE.ROOST) updateRoost(dt);
-
-    updateParts(dt);
-    updateFloats(dt);
-    frame();
+    updateParts(dt); updateFloats(dt); frame();
     requestAnimationFrame(tick);
   }
-
-  // polyfill roundRect
   if (!CanvasRenderingContext2D.prototype.roundRect) {
     CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
       const rr = Math.min(r, w / 2, h / 2);
-      this.moveTo(x + rr, y);
-      this.arcTo(x + w, y, x + w, y + h, rr);
-      this.arcTo(x + w, y + h, x, y + h, rr);
-      this.arcTo(x, y + h, x, y, rr);
-      this.arcTo(x, y, x + w, y, rr);
-      this.closePath();
-      return this;
+      this.moveTo(x + rr, y); this.arcTo(x + w, y, x + w, y + h, rr);
+      this.arcTo(x + w, y + h, x, y + h, rr); this.arcTo(x, y + h, x, y, rr);
+      this.arcTo(x, y, x + w, y, rr); this.closePath(); return this;
     };
   }
-
   if (bootEl) bootEl.remove();
   requestAnimationFrame(tick);
 })();
